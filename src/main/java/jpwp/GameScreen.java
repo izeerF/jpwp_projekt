@@ -14,6 +14,10 @@ import javafx.stage.Stage;
 
 public class GameScreen {
 
+    private int money = 100;
+    private boolean isBuyingMode = false;
+    private Label moneyLabel;
+
     public Scene getScene(Stage primaryStage, Scene menuScene) {
         BorderPane root = new BorderPane();
 
@@ -22,9 +26,18 @@ public class GameScreen {
         rightPanel.setAlignment(Pos.TOP_CENTER);
         rightPanel.setStyle("-fx-background-color: #e0e0e0;");
 
-        Label moneyLabel = new Label("Budzet: 100 pgCoinow");
-        Button buyFirewallBtn = new Button("Kup Firewall");
+        moneyLabel = new Label("Budzet: " + money + " pgCoinow");
+        Button buyFirewallBtn = new Button("Kup Firewall (Koszt: 50)");
         Button backButton = new Button("Wroc do menu");
+
+        buyFirewallBtn.setOnAction(e -> {
+            if (money >= 50) {
+                isBuyingMode = true;
+                System.out.println("kliknij aby postawic firewall");
+            } else {
+                System.out.println("masz niewystarczajaco pgCoinow");
+            }
+        });
 
         backButton.setOnAction(e -> primaryStage.setScene(menuScene));
 
@@ -34,17 +47,26 @@ public class GameScreen {
         GridPane gameBoard = new GridPane();
         gameBoard.setAlignment(Pos.CENTER);
         
-        // 12x12 grid
         for (int row = 0; row < 12; row++) {
             for (int col = 0; col < 12; col++) {
                 Rectangle tile = new Rectangle(45, 45);
                 tile.setFill(Color.WHITE);
                 tile.setStroke(Color.LIGHTGRAY);
                 
-                //square onclick
+                final int finalRow = row;
+                final int finalCol = col;
+                
                 tile.setOnMouseClicked(e -> {
-                    System.out.println("square clicked");
-                    tile.setFill(Color.BLUE);
+                    if (isBuyingMode && tile.getFill() == Color.WHITE) {
+                        money -= 50;
+                        moneyLabel.setText("Budzet: " + money + " pgCoinow");
+                        isBuyingMode = false;
+                        
+                        Firewall firewall = new Firewall(finalCol, finalRow);
+                        gameBoard.add(firewall.getGraphic(), finalCol, finalRow);
+                        
+                        System.out.println("postawiono firewall");
+                    }
                 });
                 
                 gameBoard.add(tile, col, row);
