@@ -10,6 +10,7 @@ import javafx.stage.Stage;
 
 public class App extends Application {
 
+    private Scene menuScene;
     public void start(Stage primaryStage) {
         primaryStage.setTitle("Firewall Breach");
 
@@ -20,15 +21,16 @@ public class App extends Application {
         Button startButton = new Button("Graj");
         Button exitButton = new Button("Wyjdź");
 
+        menuScene = new Scene(menuLayout, 800, 600);
+
         exitButton.setOnAction(e -> primaryStage.close());
         
         startButton.setOnAction(e -> {
-            System.out.println("start gry");
+            GameScreen gameScreen = new GameScreen();
+            primaryStage.setScene(gameScreen.getScene(primaryStage, menuScene));
         });
 
         menuLayout.getChildren().addAll(titleLabel, startButton, exitButton);
-        
-        Scene menuScene = new Scene(menuLayout, 800, 600);
         
         primaryStage.setScene(menuScene);
         primaryStage.setResizable(false);
