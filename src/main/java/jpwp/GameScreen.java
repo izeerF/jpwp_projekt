@@ -23,13 +23,16 @@ import javafx.util.Duration;
 
 public class GameScreen {
 
+    private int hp = 100;
     private int money = 100;
     private boolean isBuyingMode = false;
+    private Label hpLabel;
     private Label moneyLabel;
     private List<Virus> activeViruses = new ArrayList<>();
     
     private int[][] mapGrid = new int[12][12];
     private Rectangle[][] tilesGrid = new Rectangle[12][12];
+    private Timeline gameLoop;
 
     public Scene getScene(Stage primaryStage, Scene menuScene) {
         loadMap();
@@ -41,6 +44,7 @@ public class GameScreen {
         rightPanel.setAlignment(Pos.TOP_CENTER);
         rightPanel.setStyle("-fx-background-color: #e0e0e0;");
 
+        hpLabel = new Label("HP: " + hp);
         moneyLabel = new Label("Budzet: " + money + " pgCoinow");
         Button buyFirewallBtn = new Button("Kup Firewall (Koszt: 50)");
         Button spawnVirusBtn = new Button("Virus Test");
@@ -62,9 +66,12 @@ public class GameScreen {
             gameBoard.add(virus.getGraphic(), virus.getX(), virus.getY());
         });
 
-        backButton.setOnAction(e -> primaryStage.setScene(menuScene));
+        backButton.setOnAction(e -> {
+            if (gameLoop != null) gameLoop.stop();
+            primaryStage.setScene(menuScene);
+        });
 
-        rightPanel.getChildren().addAll(moneyLabel, buyFirewallBtn, spawnVirusBtn, backButton);
+        rightPanel.getChildren().addAll(hpLabel, moneyLabel, buyFirewallBtn, spawnVirusBtn, backButton);
         root.setRight(rightPanel);
 
         for (int row = 0; row < 12; row++) {
@@ -108,7 +115,7 @@ public class GameScreen {
         
         root.setCenter(gameBoard);
 
-        Timeline gameLoop = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
+        gameLoop = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
             List<Virus> toRemove = new ArrayList<>();
             for (Virus virus : activeViruses) {
                 int vx = virus.getX();
@@ -118,6 +125,15 @@ public class GameScreen {
                     gameBoard.getChildren().remove(virus.getGraphic());
                     toRemove.add(virus);
                     System.out.println("-10HP");
+                    
+                    hp -= 10;
+                    hpLabel.setText("HP: " + hp);
+                    
+                    if (hp <= 0) {
+                        System.out.println("Game Over");
+                        gameLoop.stop();
+                        primaryStage.setScene(menuScene);
+                    }
                 } else {
                     if (vy > 0 && (mapGrid[vy - 1][vx] == 1 || mapGrid[vy - 1][vx] == 3) && virus.getPrevY() != vy - 1) {
                         virus.moveUp();
