@@ -12,7 +12,7 @@ public class Firewall {
         this.x = x;
         this.y = y;
         
-        this.graphic = new Rectangle(45, 45);
+        this.graphic = new Rectangle(44, 44);
         this.graphic.setFill(Color.RED);
         this.graphic.setStroke(Color.BLACK);
     }
