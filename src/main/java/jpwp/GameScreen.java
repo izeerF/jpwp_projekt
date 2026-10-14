@@ -47,15 +47,25 @@ public class GameScreen {
         rightPanel.setPadding(new Insets(20));
         rightPanel.setAlignment(Pos.TOP_CENTER);
         rightPanel.setStyle("-fx-background-color: #e0e0e0;");
+        
+        rightPanel.setMinWidth(250);
+        rightPanel.setPrefWidth(250);
 
         hpLabel = new Label("hp: " + hp);
         moneyLabel = new Label("budzet: " + money + " pgCoinow");
+        
         Button buyFirewallBtn = new Button("kup firewall (koszt: 50)");
+        buyFirewallBtn.setMinWidth(180);
+        
         Button spawnVirusBtn = new Button("virus test");
+        spawnVirusBtn.setMinWidth(180);
+        
         Button backButton = new Button("wroc do menu");
+        backButton.setMinWidth(180);
 
         GridPane gameBoard = new GridPane();
         gameBoard.setAlignment(Pos.CENTER);
+        gameBoard.setPadding(new Insets(0, 40, 0, 40));
 
         buyFirewallBtn.setOnAction(e -> {
             if (isBuyingMode) {
@@ -232,20 +242,18 @@ public class GameScreen {
         gameLoop.setCycleCount(Timeline.INDEFINITE);
         gameLoop.play();
 
-        return new Scene(root, 800, 600);
+        return new Scene(root, 1000, 700);
     }
 
     private void toggleHighlight(boolean show) {
         for (int r = 0; r < 12; r++) {
             for (int c = 0; c < 12; c++) {
-                if (show) {
-                    if (mapGrid[r][c] == 1) {
-                        tilesGrid[r][c].setStroke(Color.LIMEGREEN);
-                        tilesGrid[r][c].setStrokeWidth(3);
+                if (mapGrid[r][c] == 1) {
+                    if (show) {
+                        tilesGrid[r][c].setFill(Color.LIMEGREEN);
+                    } else {
+                        tilesGrid[r][c].setFill(Color.DARKGRAY);
                     }
-                } else {
-                    tilesGrid[r][c].setStroke(Color.TRANSPARENT);
-                    tilesGrid[r][c].setStrokeWidth(1);
                 }
             }
         }
