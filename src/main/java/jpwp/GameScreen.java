@@ -1,5 +1,14 @@
 package jpwp;
 
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+import java.util.Scanner;
+import java.util.Set;
+
 import javafx.animation.KeyFrame;
 import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
@@ -24,14 +33,6 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
-import java.util.Scanner;
-import java.util.Set;
 
 public class GameScreen {
 
@@ -53,7 +54,7 @@ public class GameScreen {
     private List<WaveData> levelWaves = new ArrayList<>();
     private WaveData currentWaveData = null;
 
-    private int buyingType = 0; // 0 - nic, 1 - firewall, 2 - antivirus
+    private int buyingType = 0; // 0 - nic, 1 - firewall, 2 - antivirus, 3 - ids
     private Label levelLabel;
     private Label hpLabel;
     private Label moneyLabel;
@@ -75,7 +76,7 @@ public class GameScreen {
     public Scene getScene(Stage primaryStage, Scene menuScene) {
         currentLevel = 1;
         hp = 100;
-        money = 150;
+        money = 15000;
         gameSpeed = 1.0;
         discoveredItems.clear();
         pendingDiscoveries.clear();
@@ -85,7 +86,7 @@ public class GameScreen {
         BorderPane root = new BorderPane();
         rootStack.getChildren().add(root);
 
-        VBox rightPanel = new VBox(15);
+        VBox rightPanel = new VBox(12);
         rightPanel.setPadding(new Insets(20));
         rightPanel.setAlignment(Pos.TOP_CENTER);
         rightPanel.setStyle("-fx-background-color: #e0e0e0;");
@@ -103,6 +104,9 @@ public class GameScreen {
         
         Button buyTowerBtn = new Button("kup antywirus (koszt: 75)");
         buyTowerBtn.setMinWidth(190);
+
+        Button buyIdsBtn = new Button("kup skaner IDS (koszt: 90)");
+        buyIdsBtn.setMinWidth(190);
         
         startWaveBtn = new Button("rozpocznij fale 1");
         startWaveBtn.setMinWidth(190);
@@ -137,7 +141,7 @@ public class GameScreen {
         StackPane boardContainer = new StackPane(gameBoard, effectsLayer);
         boardContainer.setPadding(new Insets(0, 40, 0, 40));
 
-        setupLevel(currentLevel, gameBoard, effectsLayer, buyFirewallBtn, buyTowerBtn, rootStack);
+        setupLevel(currentLevel, gameBoard, effectsLayer, buyFirewallBtn, buyTowerBtn, buyIdsBtn, rootStack);
 
         buyFirewallBtn.setOnAction(e -> {
             if (buyingType == 1) {
@@ -148,6 +152,7 @@ public class GameScreen {
                 buyingType = 1;
                 buyFirewallBtn.setText("anuluj");
                 buyTowerBtn.setText("kup antywirus (koszt: 75)");
+                buyIdsBtn.setText("kup skaner IDS (koszt: 90)");
                 toggleHighlight(1);
             }
         });
@@ -161,6 +166,21 @@ public class GameScreen {
                 buyingType = 2;
                 buyTowerBtn.setText("anuluj");
                 buyFirewallBtn.setText("kup firewall (koszt: 50)");
+                buyIdsBtn.setText("kup skaner IDS (koszt: 90)");
+                toggleHighlight(2);
+            }
+        });
+
+        buyIdsBtn.setOnAction(e -> {
+            if (buyingType == 3) {
+                buyingType = 0;
+                buyIdsBtn.setText("kup skaner IDS (koszt: 90)");
+                toggleHighlight(0);
+            } else if (money >= 90) {
+                buyingType = 3;
+                buyIdsBtn.setText("anuluj");
+                buyFirewallBtn.setText("kup firewall (koszt: 50)");
+                buyTowerBtn.setText("kup antywirus (koszt: 75)");
                 toggleHighlight(2);
             }
         });
@@ -170,7 +190,7 @@ public class GameScreen {
                 if (currentLevel < maxLevels) {
                     currentLevel++;
                     money += 100;
-                    setupLevel(currentLevel, gameBoard, effectsLayer, buyFirewallBtn, buyTowerBtn, rootStack);
+                    setupLevel(currentLevel, gameBoard, effectsLayer, buyFirewallBtn, buyTowerBtn, buyIdsBtn, rootStack);
                 }
             } else if (!isWaveActive && waveNumber < levelWaves.size()) {
                 currentWaveData = levelWaves.get(waveNumber);
@@ -203,17 +223,17 @@ public class GameScreen {
         });
 
         infoButton.setOnAction(e -> {
-            if (!isPopupOpen) {
+            if (!isPopupOpen && !discoveredItems.isEmpty()) {
                 isPopupOpen = true;
                 if (gameLoop != null) gameLoop.pause();
-                InfoOverlay.showCarousel(rootStack, () -> {
+                InfoOverlay.showCarousel(rootStack, discoveredItems, () -> {
                     isPopupOpen = false;
                     if (gameLoop != null) gameLoop.play();
                 });
             }
         });
 
-        rightPanel.getChildren().addAll(levelLabel, waveLabel, hpLabel, moneyLabel, buyFirewallBtn, buyTowerBtn, startWaveBtn, speedBtn, backButton, spacer, bottomControls);
+        rightPanel.getChildren().addAll(levelLabel, waveLabel, hpLabel, moneyLabel, buyFirewallBtn, buyTowerBtn, buyIdsBtn, startWaveBtn, speedBtn, backButton, spacer, bottomControls);
         root.setRight(rightPanel);
         root.setCenter(boardContainer);
 
@@ -232,8 +252,8 @@ public class GameScreen {
             for (Antivirus tower : activeTowers) {
                 for (Virus virus : activeViruses) {
                     if (!toRemove.contains(virus) && tower.isInRange(virus.getX(), virus.getY())) {
-                        drawLaser(effectsLayer, tower.getX(), tower.getY(), virus.getX(), virus.getY());
-                        virus.takeAntivirusDamage(tower.getDamage());
+                        drawLaser(effectsLayer, tower.getX(), tower.getY(), virus.getX(), virus.getY(), tower.getLaserColor());
+                        virus.takeTowerDamage(tower.getBaseDamage(), tower.isIds());
                         if (virus.getHp() <= 0) {
                             gameBoard.getChildren().remove(virus.getGraphic());
                             toRemove.add(virus);
@@ -247,24 +267,31 @@ public class GameScreen {
 
             for (Virus virus : activeViruses) {
                 if (toRemove.contains(virus)) continue;
-                
-                int vx = virus.getX();
-                int vy = virus.getY();
 
-                if (vx == 11) {
-                    gameBoard.getChildren().remove(virus.getGraphic());
-                    toRemove.add(virus);
-                    System.out.println("-10hp");
-                    
-                    hp -= 10;
-                    hpLabel.setText("hp: " + hp);
-                    
-                    if (hp <= 0) {
-                        System.out.println("game over");
-                        gameLoop.stop();
-                        primaryStage.setScene(menuScene);
+                int steps = virus.getStepsPerTick();
+                int startVx = virus.getX();
+                int startVy = virus.getY();
+                boolean removedThisTurn = false;
+
+                for (int s = 0; s < steps; s++) {
+                    int vx = virus.getX();
+                    int vy = virus.getY();
+
+                    if (vx == 11) {
+                        gameBoard.getChildren().remove(virus.getGraphic());
+                        toRemove.add(virus);
+                        removedThisTurn = true;
+                        
+                        hp -= 10;
+                        hpLabel.setText("hp: " + hp);
+                        
+                        if (hp <= 0) {
+                            gameLoop.stop();
+                            primaryStage.setScene(menuScene);
+                        }
+                        break;
                     }
-                } else {
+
                     boolean canUp = vy > 0 && (mapGrid[vy - 1][vx] == 1 || mapGrid[vy - 1][vx] == 3) && !virus.hasVisited(vx, vy - 1);
                     boolean canDown = vy < 11 && (mapGrid[vy + 1][vx] == 1 || mapGrid[vy + 1][vx] == 3) && !virus.hasVisited(vx, vy + 1);
                     boolean canRight = vx < 11 && (mapGrid[vy][vx + 1] == 1 || mapGrid[vy][vx + 1] == 3) && !virus.hasVisited(vx + 1, vy);
@@ -291,32 +318,32 @@ public class GameScreen {
                     }
 
                     if (nextX != vx || nextY != vy) {
-                        boolean destroyed = false;
-                        
                         if (mapGrid[nextY][nextX] == 3 && !virus.isFirewallImmune()) {
                             Firewall fw = activeFirewalls[nextY][nextX];
                             if (fw != null && !fw.isOnCooldown()) {
                                 fw.destroyEnemy();
                                 gameBoard.getChildren().remove(virus.getGraphic());
                                 toRemove.add(virus);
-                                destroyed = true;
+                                removedThisTurn = true;
+                                break;
                             }
                         }
-                        
-                        if (!destroyed) {
-                            int dx = nextX - vx;
-                            int dy = nextY - vy;
 
-                            if (dx > 0) virus.moveRight();
-                            else if (dx < 0) virus.moveLeft();
-                            else if (dy > 0) virus.moveDown();
-                            else if (dy < 0) virus.moveUp();
-                            
-                            GridPane.setColumnIndex(virus.getGraphic(), virus.getX() + 1);
-                            GridPane.setRowIndex(virus.getGraphic(), virus.getY());
-                            virus.animateMove(dx, dy, gameSpeed);
-                        }
+                        if (nextX > vx) virus.moveRight();
+                        else if (nextX < vx) virus.moveLeft();
+                        else if (nextY > vy) virus.moveDown();
+                        else if (nextY < vy) virus.moveUp();
+                    } else {
+                        break;
                     }
+                }
+
+                if (!removedThisTurn && (virus.getX() != startVx || virus.getY() != startVy)) {
+                    int totalDx = virus.getX() - startVx;
+                    int totalDy = virus.getY() - startVy;
+                    GridPane.setColumnIndex(virus.getGraphic(), virus.getX() + 1);
+                    GridPane.setRowIndex(virus.getGraphic(), virus.getY());
+                    virus.animateMove(totalDx, totalDy, gameSpeed);
                 }
             }
             activeViruses.removeAll(toRemove);
@@ -398,7 +425,7 @@ public class GameScreen {
         });
     }
 
-    private void setupLevel(int level, GridPane gameBoard, Pane effectsLayer, Button buyFirewallBtn, Button buyTowerBtn, StackPane rootStack) {
+    private void setupLevel(int level, GridPane gameBoard, Pane effectsLayer, Button buyFirewallBtn, Button buyTowerBtn, Button buyIdsBtn, StackPane rootStack) {
         gameBoard.getChildren().clear();
         effectsLayer.getChildren().clear();
         activeViruses.clear();
@@ -415,11 +442,11 @@ public class GameScreen {
         loadMap("/map_level" + level + ".txt");
         loadWaves("/waves_level" + level + ".txt");
 
-        boolean hasAntivirusTiles = false;
+        boolean hasTowerTiles = false;
         for (int r = 0; r < 12; r++) {
             for (int c = 0; c < 12; c++) {
                 if (mapGrid[r][c] == 2) {
-                    hasAntivirusTiles = true;
+                    hasTowerTiles = true;
                     break;
                 }
             }
@@ -427,11 +454,13 @@ public class GameScreen {
 
         if (level == 1) {
             queueDiscovery("FW", rootStack);
-            if (hasAntivirusTiles) {
+            if (hasTowerTiles) {
                 queueDiscovery("AV", rootStack);
+                queueDiscovery("IDS", rootStack);
             }
-        } else if (hasAntivirusTiles) {
+        } else if (hasTowerTiles) {
             queueDiscovery("AV", rootStack);
+            queueDiscovery("IDS", rootStack);
         }
 
         levelLabel.setText("poziom: " + level + " / " + maxLevels);
@@ -439,7 +468,9 @@ public class GameScreen {
         moneyLabel.setText("budzet: " + money + " pgCoinow");
         buyFirewallBtn.setText("kup firewall (koszt: 50)");
         buyTowerBtn.setText("kup antywirus (koszt: 75)");
-        buyTowerBtn.setDisable(!hasAntivirusTiles);
+        buyIdsBtn.setText("kup skaner IDS (koszt: 90)");
+        buyTowerBtn.setDisable(!hasTowerTiles);
+        buyIdsBtn.setDisable(!hasTowerTiles);
 
         if (levelWaves.isEmpty()) {
             startWaveBtn.setText("brak fal w pliku");
@@ -496,16 +527,19 @@ public class GameScreen {
                         Firewall firewall = new Firewall(finalCol, finalRow);
                         activeFirewalls[finalRow][finalCol] = firewall;
                         gameBoard.add(firewall.getGraphic(), finalCol + 1, finalRow);
-                    } else if (buyingType == 2 && mapGrid[finalRow][finalCol] == 2) {
-                        money -= 75;
+                    } else if ((buyingType == 2 || buyingType == 3) && mapGrid[finalRow][finalCol] == 2) {
+                        boolean isIds = (buyingType == 3);
+                        int cost = isIds ? 90 : 75;
+                        money -= cost;
                         moneyLabel.setText("budzet: " + money + " pgCoinow");
                         buyingType = 0;
                         buyTowerBtn.setText("kup antywirus (koszt: 75)");
+                        buyIdsBtn.setText("kup skaner IDS (koszt: 90)");
                         
                         toggleHighlight(0);
                         mapGrid[finalRow][finalCol] = 4;
                         
-                        Antivirus tower = new Antivirus(finalCol, finalRow);
+                        Antivirus tower = new Antivirus(finalCol, finalRow, isIds);
                         activeTowers.add(tower);
                         gameBoard.add(tower.getGraphic(), finalCol + 1, finalRow);
                     }
@@ -537,14 +571,14 @@ public class GameScreen {
         }
     }
 
-    private void drawLaser(Pane layer, int fromCol, int fromRow, int toCol, int toRow) {
+    private void drawLaser(Pane layer, int fromCol, int fromRow, int toCol, int toRow, Color laserColor) {
         double startX = (fromCol + 1) * 45.0 + 22.5;
         double startY = fromRow * 45.0 + 22.5;
         double endX = (toCol + 1) * 45.0 + 22.5;
         double endY = toRow * 45.0 + 22.5;
 
         Line laser = new Line(startX, startY, endX, endY);
-        laser.setStroke(Color.GOLD);
+        laser.setStroke(laserColor);
         laser.setStrokeWidth(3);
         layer.getChildren().add(laser);
 

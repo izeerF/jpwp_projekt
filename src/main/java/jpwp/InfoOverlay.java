@@ -2,6 +2,7 @@ package jpwp;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -55,10 +56,10 @@ public class InfoOverlay {
         list.add(new CardEntry(
             "V", "nowy przeciwnik", virusIcon,
             "virus (kod: V)",
-            "hp: 30 | nagroda: 15 pgCoinów",
+            "hp: 30 | prędkość: normalna | nagroda: 15 pgCoinów",
             "podstawowy złośliwy program próbujący przedostać się przez sieć do serwera.",
             "często występuje w dużych, gęstych grupach na ścieżce.",
-            "ginie natychmiast na aktywnym firewallu; otrzymuje 100% obrażeń od antywirusa.",
+            "ginie natychmiast na aktywnym firewallu; podatny na antywirus.",
             "w rzeczywistości: klasyczny wirus komputerowy replikujący się w plikach, łatwy do wykrycia przez podstawowe sygnatury i filtrowanie ruchu."
         ));
 
@@ -68,11 +69,24 @@ public class InfoOverlay {
         list.add(new CardEntry(
             "T", "nowy przeciwnik", trojanIcon,
             "trojan (kod: T)",
-            "hp: 60 | nagroda: 25 pgCoinów",
+            "hp: 45 | prędkość: normalna | nagroda: 25 pgCoinów",
             "zamaskowany pakiet danych udający bezpieczny ruch sieciowy.",
-            "całkowicie omija firewall oraz blokuje 50% obrażeń od antywirusa.",
-            "rzadziej występuje w falach ze względu na większą złożoność ataku.",
+            "całkowicie omija firewall oraz redukuje obrażenia od zwykłego antywirusa.",
+            "bardzo podatny na systemy wykrywania włamań (IDS - podwójne obrażenia).",
             "w rzeczywistości: koń trojański podszywa się pod legalne oprogramowanie, dzięki czemu przechodzi przez zaporę sieciową (firewall) jako zaufany ruch."
+        ));
+
+        Circle wormIcon = new Circle(28, Color.MAGENTA);
+        wormIcon.setStroke(Color.DARKMAGENTA);
+        wormIcon.setStrokeWidth(3);
+        list.add(new CardEntry(
+            "W", "nowy przeciwnik", wormIcon,
+            "worm / robak (kod: W)",
+            "hp: 40 | prędkość: podwójna (x2) | nagroda: 20 pgCoinów",
+            "autonomiczny program błyskawicznie rozprzestrzeniający się po łączach sieciowych.",
+            "porusza się dwa pola na turę i ignoruje skanery IDS (75% redukcji obrażeń).",
+            "zostaje zatrzymany przez firewall oraz dostaje zwiększone obrażenia od antywirusa.",
+            "w rzeczywistości: robak sieciowy (np. WannaCry) samoczynnie skanuje sieć i wykorzystuje luki w protokołach do błyskawicznego przeskakiwania między węzłami."
         ));
 
         Rectangle fwIcon = new Rectangle(52, 52, Color.RED);
@@ -84,7 +98,7 @@ public class InfoOverlay {
             "firewall (koszt: 50 pgCoinów)",
             "pojemność: 5 blokad | czas odnowienia: 5s",
             "zapora sieciowa stawiana bezpośrednio na trasie przesyłu danych.",
-            "natychmiastowo neutralizuje podstawowe wirusy bez względu na ich hp.",
+            "natychmiastowo neutralizuje wirusy oraz szybkie robaki bez względu na ich hp.",
             "przeciąża się po 5 blokadach i jest bezradny wobec zamaskowanych trojanów.",
             "w rzeczywistości: zapora sieciowa filtrująca pakiety na podstawie reguł (np. portów i adresów ip), może zostać zapchana przy zbyt dużym ruchu."
         ));
@@ -99,10 +113,29 @@ public class InfoOverlay {
             "AV", "nowa wieżyczka", avIcon,
             "antywirus (koszt: 75 pgCoinów)",
             "obrażenia: 10 | zasięg: 2 pola",
-            "aktywny skaner analizujący ruch w promieniu dwóch kratek wokół węzła.",
-            "nie przeciąża się i potrafi wykryć oraz zniszczyć ukryte trojany.",
-            "wymaga czasu na pełne przeskanowanie i usunięcie zagrożenia.",
-            "w rzeczywistości: oprogramowanie antywirusowe (edr), które analizuje zachowanie plików i procesów wewnątrz systemu, wykrywając nawet ukryte zagrożenia."
+            "aktywny skaner analizujący pliki i ruch w promieniu dwóch kratek wokół węzła.",
+            "nie przeciąża się, skuteczny przeciwko wirusom oraz szybkim robakom (120% obrażeń).",
+            "słabszy przeciwko dobrze zamaskowanym trojanom (60% obrażeń).",
+            "w rzeczywistości: oprogramowanie antywirusowe analizujące sygnatury i zachowanie plików wewnątrz stacji roboczych."
+        ));
+
+        StackPane idsIcon = new StackPane();
+        Rectangle idsBase = new Rectangle(50, 50);
+        idsBase.setArcWidth(12);
+        idsBase.setArcHeight(12);
+        idsBase.setFill(Color.DARKSLATEGRAY);
+        idsBase.setStroke(Color.LIME);
+        idsBase.setStrokeWidth(3);
+        Circle idsCore = new Circle(12, Color.LIME);
+        idsIcon.getChildren().addAll(idsBase, idsCore);
+        list.add(new CardEntry(
+            "IDS", "nowa wieżyczka", idsIcon,
+            "skaner IDS (koszt: 90 pgCoinów)",
+            "obrażenia: 12 | zasięg: 3 pola",
+            "zaawansowany system głębokiej inspekcji pakietów (Deep Packet Inspection) o dużym zasięgu.",
+            "demaskuje trojany i zadaje im podwójne obrażenia (200%), duży zasięg 3 kratek.",
+            "nieskuteczny przeciwko szybkim robakom i podstawowym wirusom.",
+            "w rzeczywistości: Intrusion Detection System analizuje anomalie w ruchu sieciowym, wykrywając ukryte tunele i trojany omijające zwykły firewall."
         ));
 
         return list;
@@ -115,8 +148,19 @@ public class InfoOverlay {
         return null;
     }
 
-    public static void showCarousel(StackPane rootStack, Runnable onClose) {
-        List<CardEntry> cards = getAllCards();
+    public static void showCarousel(StackPane rootStack, Set<String> discoveredIds, Runnable onClose) {
+        List<CardEntry> cards = new ArrayList<>();
+        for (CardEntry entry : getAllCards()) {
+            if (discoveredIds.contains(entry.id)) {
+                cards.add(entry);
+            }
+        }
+
+        if (cards.isEmpty()) {
+            if (onClose != null) onClose.run();
+            return;
+        }
+
         final int[] currentIndex = {0};
 
         StackPane backdrop = new StackPane();

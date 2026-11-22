@@ -61,8 +61,10 @@ public class Virus {
         }
     }
 
-    public void takeAntivirusDamage(int baseAmount) {
-        int actualDamage = (int) Math.round(baseAmount * type.getAntivirusDamageMultiplier());
+    public void takeTowerDamage(int baseAmount, boolean fromIds) {
+        double mult = fromIds ? type.getIdsDamageMultiplier() : type.getAntivirusDamageMultiplier();
+        int actualDamage = (int) Math.round(baseAmount * mult);
+        if (actualDamage < 1) actualDamage = 1;
         this.hp -= actualDamage;
         
         double ratio = (double) this.hp / type.getMaxHp();
@@ -73,10 +75,8 @@ public class Virus {
         }
     }
 
-    public boolean isFirewallImmune() {
-        return type.isFirewallImmune();
-    }
-
+    public boolean isFirewallImmune() { return type.isFirewallImmune(); }
+    public int getStepsPerTick() { return type.getStepsPerTick(); }
     public int getHp() { return hp; }
     public int getReward() { return type.getReward(); }
     public EnemyType getType() { return type; }
@@ -86,7 +86,7 @@ public class Virus {
     public void moveUp() { y -= 1; markVisited(); }
     public void moveDown() { y += 1; markVisited(); }
 
-public void animateMove(int deltaX, int deltaY, double speedMultiplier) {
+    public void animateMove(int deltaX, int deltaY, double speedMultiplier) {
         graphic.setTranslateX(-deltaX * 45);
         graphic.setTranslateY(-deltaY * 45);
 
