@@ -2,6 +2,7 @@ package jpwp;
 
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
+import javafx.scene.shape.StrokeType;
 
 public class Firewall {
     private int x;
@@ -20,6 +21,7 @@ public class Firewall {
         this.graphic = new Rectangle(44, 44);
         this.graphic.setFill(Color.RED);
         this.graphic.setStroke(Color.BLACK);
+        this.graphic.setStrokeType(StrokeType.INSIDE);
     }
 
     public void destroyEnemy() {
