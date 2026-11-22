@@ -29,9 +29,19 @@ public class GameScreen {
 
     private int hp = 100;
     private int money = 150;
+    private int waveNumber = 0;
+    private boolean isWaveActive = false;
+    private int spawnedInCurrentWave = 0;
+
+    private List<WaveData> levelWaves = new ArrayList<>();
+    private WaveData currentWaveData = null;
+
     private int buyingType = 0; // 0 - nic, 1 - firewall, 2 - antivirus
     private Label hpLabel;
     private Label moneyLabel;
+    private Label waveLabel;
+    private Button startWaveBtn;
+
     private List<Virus> activeViruses = new ArrayList<>();
     private List<Antivirus> activeTowers = new ArrayList<>();
     
@@ -44,7 +54,8 @@ public class GameScreen {
     private int[][] intersectionState = new int[12][12];
 
     public Scene getScene(Stage primaryStage, Scene menuScene) {
-        loadMap();
+        loadMap("/map_level1.txt");
+        loadWaves("/waves_level1.txt");
 
         BorderPane root = new BorderPane();
 
@@ -56,6 +67,7 @@ public class GameScreen {
         rightPanel.setMinWidth(250);
         rightPanel.setPrefWidth(250);
 
+        waveLabel = new Label("fala: 0 / " + levelWaves.size());
         hpLabel = new Label("hp: " + hp);
         moneyLabel = new Label("budzet: " + money + " pgCoinow");
         
@@ -65,8 +77,12 @@ public class GameScreen {
         Button buyTowerBtn = new Button("kup antywirus (koszt: 75)");
         buyTowerBtn.setMinWidth(190);
         
-        Button spawnVirusBtn = new Button("virus test");
-        spawnVirusBtn.setMinWidth(190);
+        startWaveBtn = new Button("rozpocznij fale 1");
+        startWaveBtn.setMinWidth(190);
+        if (levelWaves.isEmpty()) {
+            startWaveBtn.setText("brak fal w pliku");
+            startWaveBtn.setDisable(true);
+        }
         
         Button backButton = new Button("wroc do menu");
         backButton.setMinWidth(190);
@@ -109,18 +125,16 @@ public class GameScreen {
             }
         });
 
-        spawnVirusBtn.setOnAction(e -> {
-            List<Integer> spawns = new ArrayList<>();
-            for (int r = 0; r < 12; r++) {
-                if (mapGrid[r][0] == 1) spawns.add(r);
-            }
-            if (!spawns.isEmpty()) {
-                int spawnY = spawns.get(currentSpawnIndex % spawns.size());
-                currentSpawnIndex++;
+        startWaveBtn.setOnAction(e -> {
+            if (!isWaveActive && waveNumber < levelWaves.size()) {
+                currentWaveData = levelWaves.get(waveNumber);
+                waveNumber++;
+                isWaveActive = true;
+                spawnedInCurrentWave = 0;
                 
-                Virus virus = new Virus(0, spawnY);
-                activeViruses.add(virus);
-                gameBoard.add(virus.getGraphic(), virus.getX() + 1, virus.getY());
+                waveLabel.setText("fala: " + waveNumber + " / " + levelWaves.size());
+                startWaveBtn.setText("trwa fala " + waveNumber + "...");
+                startWaveBtn.setDisable(true);
             }
         });
 
@@ -129,7 +143,7 @@ public class GameScreen {
             primaryStage.setScene(menuScene);
         });
 
-        rightPanel.getChildren().addAll(hpLabel, moneyLabel, buyFirewallBtn, buyTowerBtn, spawnVirusBtn, backButton);
+        rightPanel.getChildren().addAll(waveLabel, hpLabel, moneyLabel, buyFirewallBtn, buyTowerBtn, startWaveBtn, backButton);
         root.setRight(rightPanel);
 
         for (int row = 0; row < 12; row++) {
@@ -173,8 +187,8 @@ public class GameScreen {
                         buyingType = 0;
                         buyFirewallBtn.setText("kup firewall (koszt: 50)");
                         
-                        mapGrid[finalRow][finalCol] = 3;
                         toggleHighlight(0);
+                        mapGrid[finalRow][finalCol] = 3;
                         
                         Firewall firewall = new Firewall(finalCol, finalRow);
                         activeFirewalls[finalRow][finalCol] = firewall;
@@ -185,8 +199,8 @@ public class GameScreen {
                         buyingType = 0;
                         buyTowerBtn.setText("kup antywirus (koszt: 75)");
                         
-                        mapGrid[finalRow][finalCol] = 4;
                         toggleHighlight(0);
+                        mapGrid[finalRow][finalCol] = 4;
                         
                         Antivirus tower = new Antivirus(finalCol, finalRow);
                         activeTowers.add(tower);
@@ -216,11 +230,11 @@ public class GameScreen {
                 for (Virus virus : activeViruses) {
                     if (!toRemove.contains(virus) && tower.isInRange(virus.getX(), virus.getY())) {
                         drawLaser(effectsLayer, tower.getX(), tower.getY(), virus.getX(), virus.getY());
-                        virus.takeDamage(tower.getDamage());
+                        virus.takeAntivirusDamage(tower.getDamage());
                         if (virus.getHp() <= 0) {
                             gameBoard.getChildren().remove(virus.getGraphic());
                             toRemove.add(virus);
-                            money += 15;
+                            money += virus.getReward();
                             moneyLabel.setText("budzet: " + money + " pgCoinow");
                         }
                         break;
@@ -276,7 +290,7 @@ public class GameScreen {
                     if (nextX != vx || nextY != vy) {
                         boolean destroyed = false;
                         
-                        if (mapGrid[nextY][nextX] == 3) {
+                        if (mapGrid[nextY][nextX] == 3 && !virus.isFirewallImmune()) {
                             Firewall fw = activeFirewalls[nextY][nextX];
                             if (fw != null && !fw.isOnCooldown()) {
                                 fw.destroyEnemy();
@@ -303,11 +317,65 @@ public class GameScreen {
                 }
             }
             activeViruses.removeAll(toRemove);
+
+            if (isWaveActive && currentWaveData != null) {
+                List<EnemyType> sequence = currentWaveData.getEnemySequence();
+                if (spawnedInCurrentWave < sequence.size()) {
+                    List<Integer> spawns = new ArrayList<>();
+                    for (int r = 0; r < 12; r++) {
+                        if (mapGrid[r][0] == 1) spawns.add(r);
+                    }
+                    if (!spawns.isEmpty()) {
+                        int spawnY = spawns.get(currentSpawnIndex % spawns.size());
+                        currentSpawnIndex++;
+
+                        EnemyType type = sequence.get(spawnedInCurrentWave);
+                        spawnedInCurrentWave++;
+
+                        Virus virus = new Virus(0, spawnY, type);
+                        activeViruses.add(virus);
+                        gameBoard.add(virus.getGraphic(), virus.getX() + 1, virus.getY());
+                    }
+                } else if (activeViruses.isEmpty()) {
+                    isWaveActive = false;
+                    
+                    if (waveNumber < levelWaves.size()) {
+                        startWaveBtn.setText("rozpocznij fale " + (waveNumber + 1));
+                        startWaveBtn.setDisable(false);
+                    } else {
+                        startWaveBtn.setText("poziom ukonczony");
+                        startWaveBtn.setDisable(true);
+                    }
+                }
+            }
+
+            updateVirusStacks();
         }));
         gameLoop.setCycleCount(Timeline.INDEFINITE);
         gameLoop.play();
 
         return new Scene(root, 1000, 700);
+    }
+
+    private void updateVirusStacks() {
+        int[][] counts = new int[12][12];
+        for (Virus v : activeViruses) {
+            counts[v.getY()][v.getX()]++;
+        }
+
+        boolean[][] shown = new boolean[12][12];
+        for (Virus v : activeViruses) {
+            int vx = v.getX();
+            int vy = v.getY();
+            int count = counts[vy][vx];
+
+            if (!shown[vy][vx]) {
+                v.updateStackDisplay(count, true);
+                shown[vy][vx] = true;
+            } else {
+                v.updateStackDisplay(count, false);
+            }
+        }
     }
 
     private void drawLaser(Pane layer, int fromCol, int fromRow, int toCol, int toRow) {
@@ -332,15 +400,15 @@ public class GameScreen {
                 if (mapGrid[r][c] == 1) {
                     tilesGrid[r][c].setFill(mode == 1 ? Color.LIMEGREEN : Color.DARKGRAY);
                 } else if (mapGrid[r][c] == 2) {
-                    tilesGrid[r][c].setFill(mode == 2 ? Color.GOLD : Color.LIGHTBLUE);
+                    tilesGrid[r][c].setFill(mode == 2 ? Color.LIMEGREEN : Color.LIGHTBLUE);
                 }
             }
         }
     }
 
-    private void loadMap() {
+    private void loadMap(String path) {
         try {
-            InputStream is = getClass().getResourceAsStream("/map.txt");
+            InputStream is = getClass().getResourceAsStream(path);
             Scanner scanner = new Scanner(is);
             for (int row = 0; row < 12; row++) {
                 for (int col = 0; col < 12; col++) {
@@ -350,6 +418,30 @@ public class GameScreen {
             scanner.close();
         } catch (Exception e) {
             System.out.println("nie udalo sie zaladowac pliku mapy");
+        }
+    }
+
+    private void loadWaves(String path) {
+        levelWaves.clear();
+        try {
+            InputStream is = getClass().getResourceAsStream(path);
+            Scanner scanner = new Scanner(is);
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine().trim();
+                if (line.isEmpty() || line.startsWith("#")) continue;
+
+                String[] tokens = line.split("\\s+");
+                List<EnemyType> seq = new ArrayList<>();
+                for (String token : tokens) {
+                    seq.add(EnemyType.fromCode(token));
+                }
+                if (!seq.isEmpty()) {
+                    levelWaves.add(new WaveData(seq));
+                }
+            }
+            scanner.close();
+        } catch (Exception e) {
+            System.out.println("nie udalo sie zaladowac pliku fal");
         }
     }
 }

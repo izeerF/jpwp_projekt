@@ -18,7 +18,7 @@ public class Firewall {
         this.enemiesDestroyed = 0;
         this.cooldownTimer = 0;
         this.onCooldown = false;
-        this.graphic = new Rectangle(44, 44);
+        this.graphic = new Rectangle(45, 45);
         this.graphic.setFill(Color.RED);
         this.graphic.setStroke(Color.BLACK);
         this.graphic.setStrokeType(StrokeType.INSIDE);
