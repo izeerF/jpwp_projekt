@@ -86,11 +86,11 @@ public class Virus {
     public void moveUp() { y -= 1; markVisited(); }
     public void moveDown() { y += 1; markVisited(); }
 
-    public void animateMove(int deltaX, int deltaY) {
+public void animateMove(int deltaX, int deltaY, double speedMultiplier) {
         graphic.setTranslateX(-deltaX * 45);
         graphic.setTranslateY(-deltaY * 45);
 
-        TranslateTransition tt = new TranslateTransition(Duration.millis(350), graphic);
+        TranslateTransition tt = new TranslateTransition(Duration.millis(350 / speedMultiplier), graphic);
         tt.setToX(0);
         tt.setToY(0);
         tt.play();
