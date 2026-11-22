@@ -1,14 +1,5 @@
 package jpwp;
 
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
-import java.util.Scanner;
-import java.util.Set;
-
 import javafx.animation.KeyFrame;
 import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
@@ -33,11 +24,19 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+import java.util.Scanner;
+import java.util.Set;
 
 public class GameScreen {
 
     private int currentLevel = 1;
-    private final int maxLevels = 2;
+    private final int maxLevels = 3;
     private boolean levelCompleted = false;
 
     private int hp = 100;
@@ -49,12 +48,14 @@ public class GameScreen {
 
     private Set<String> discoveredItems = new HashSet<>();
     private Queue<String> pendingDiscoveries = new LinkedList<>();
+    private int pendingLevelIntro = 0;
     private boolean isPopupOpen = false;
 
     private List<WaveData> levelWaves = new ArrayList<>();
     private WaveData currentWaveData = null;
 
     private int buyingType = 0; // 0 - nic, 1 - firewall, 2 - antivirus, 3 - ids
+    private Label levelTitleLabel;
     private Label levelLabel;
     private Label hpLabel;
     private Label moneyLabel;
@@ -76,10 +77,11 @@ public class GameScreen {
     public Scene getScene(Stage primaryStage, Scene menuScene) {
         currentLevel = 1;
         hp = 100;
-        money = 15000;
+        money = 150;
         gameSpeed = 1.0;
         discoveredItems.clear();
         pendingDiscoveries.clear();
+        pendingLevelIntro = 0;
         isPopupOpen = false;
 
         StackPane rootStack = new StackPane();
@@ -93,6 +95,10 @@ public class GameScreen {
         
         rightPanel.setMinWidth(250);
         rightPanel.setPrefWidth(250);
+
+        levelTitleLabel = new Label("sieć domowa");
+        levelTitleLabel.setFont(Font.font("System", FontWeight.BOLD, 16));
+        levelTitleLabel.setTextFill(Color.DARKSLATEGRAY);
 
         levelLabel = new Label("poziom: " + currentLevel);
         waveLabel = new Label("fala: 0 / 0");
@@ -191,6 +197,7 @@ public class GameScreen {
                     currentLevel++;
                     money += 100;
                     setupLevel(currentLevel, gameBoard, effectsLayer, buyFirewallBtn, buyTowerBtn, buyIdsBtn, rootStack);
+                    processPopups(rootStack);
                 }
             } else if (!isWaveActive && waveNumber < levelWaves.size()) {
                 currentWaveData = levelWaves.get(waveNumber);
@@ -233,7 +240,7 @@ public class GameScreen {
             }
         });
 
-        rightPanel.getChildren().addAll(levelLabel, waveLabel, hpLabel, moneyLabel, buyFirewallBtn, buyTowerBtn, buyIdsBtn, startWaveBtn, speedBtn, backButton, spacer, bottomControls);
+        rightPanel.getChildren().addAll(levelTitleLabel, levelLabel, waveLabel, hpLabel, moneyLabel, buyFirewallBtn, buyTowerBtn, buyIdsBtn, startWaveBtn, speedBtn, backButton, spacer, bottomControls);
         root.setRight(rightPanel);
         root.setCenter(boardContainer);
 
@@ -393,7 +400,7 @@ public class GameScreen {
         gameLoop.setRate(gameSpeed);
         gameLoop.play();
 
-        processNextDiscovery(rootStack);
+        processPopups(rootStack);
 
         return new Scene(rootStack, 1000, 700);
     }
@@ -402,27 +409,44 @@ public class GameScreen {
         if (!discoveredItems.contains(id)) {
             discoveredItems.add(id);
             pendingDiscoveries.add(id);
-            processNextDiscovery(rootStack);
+            processPopups(rootStack);
         }
     }
 
-    private void processNextDiscovery(StackPane rootStack) {
-        if (isPopupOpen || pendingDiscoveries.isEmpty()) return;
+    private void processPopups(StackPane rootStack) {
+        if (isPopupOpen) return;
 
-        isPopupOpen = true;
-        if (gameLoop != null) gameLoop.pause();
+        if (pendingLevelIntro > 0) {
+            isPopupOpen = true;
+            if (gameLoop != null) gameLoop.pause();
 
-        String nextId = pendingDiscoveries.poll();
-        InfoOverlay.CardEntry entry = InfoOverlay.getCardById(nextId);
+            int levelToShow = pendingLevelIntro;
+            pendingLevelIntro = 0;
 
-        InfoOverlay.showDiscoveryPopup(rootStack, entry, () -> {
-            isPopupOpen = false;
-            if (!pendingDiscoveries.isEmpty()) {
-                processNextDiscovery(rootStack);
-            } else if (gameLoop != null) {
-                gameLoop.play();
-            }
-        });
+            InfoOverlay.showLevelIntroPopup(rootStack, levelToShow, () -> {
+                isPopupOpen = false;
+                processPopups(rootStack);
+            });
+            return;
+        }
+
+        if (!pendingDiscoveries.isEmpty()) {
+            isPopupOpen = true;
+            if (gameLoop != null) gameLoop.pause();
+
+            String nextId = pendingDiscoveries.poll();
+            InfoOverlay.CardEntry entry = InfoOverlay.getCardById(nextId);
+
+            InfoOverlay.showDiscoveryPopup(rootStack, entry, () -> {
+                isPopupOpen = false;
+                processPopups(rootStack);
+            });
+            return;
+        }
+
+        if (gameLoop != null) {
+            gameLoop.play();
+        }
     }
 
     private void setupLevel(int level, GridPane gameBoard, Pane effectsLayer, Button buyFirewallBtn, Button buyTowerBtn, Button buyIdsBtn, StackPane rootStack) {
@@ -438,6 +462,8 @@ public class GameScreen {
         isWaveActive = false;
         levelCompleted = false;
         buyingType = 0;
+
+        pendingLevelIntro = level;
 
         loadMap("/map_level" + level + ".txt");
         loadWaves("/waves_level" + level + ".txt");
@@ -463,6 +489,8 @@ public class GameScreen {
             queueDiscovery("IDS", rootStack);
         }
 
+        InfoOverlay.LevelEntry levelInfo = InfoOverlay.getLevelInfo(level);
+        levelTitleLabel.setText(levelInfo.title);
         levelLabel.setText("poziom: " + level + " / " + maxLevels);
         waveLabel.setText("fala: 0 / " + levelWaves.size());
         moneyLabel.setText("budzet: " + money + " pgCoinow");

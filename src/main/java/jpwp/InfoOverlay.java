@@ -317,4 +317,114 @@ public class InfoOverlay {
         card.getChildren().addAll(header, roleLabel, prosLabel, consLabel, spacer, realWorldLabel);
         return card;
     }
+    public static class LevelEntry {
+        int levelNumber;
+        String title;
+        String difficulty;
+        String difficultyColor;
+        String description;
+
+        public LevelEntry(int levelNumber, String title, String difficulty, String difficultyColor, String description) {
+            this.levelNumber = levelNumber;
+            this.title = title;
+            this.difficulty = difficulty;
+            this.difficultyColor = difficultyColor;
+            this.description = description;
+        }
+    }
+
+    public static LevelEntry getLevelInfo(int level) {
+        switch (level) {
+            case 1:
+                return new LevelEntry(
+                    1,
+                    "sieć domowa",
+                    "trudność: niska",
+                    "#2b8a3e",
+                    "prosty router domowy z jednym głównym łączem dostępowym. podstawowa ochrona przed prostymi wirusami i pierwszymi próbami włamań."
+                );
+            case 2:
+                return new LevelEntry(
+                    2,
+                    "sieć małej firmy",
+                    "trudność: średnia",
+                    "#e67700",
+                    "rozbudowana sieć lokalna z kilkoma punktami styku z internetem. pojawiają się zamaskowane trojany oraz szybkie robaki sieciowe."
+                );
+            case 3:
+            default:
+                return new LevelEntry(
+                    3,
+                    "sieć korporacji",
+                    "trudność: wysoka",
+                    "#c92a2a",
+                    "złożona infrastruktura serwerowa z wieloma węzłami i rozgałęzieniami ruchu. wymaga pełnej synchronizacji firewalli, antywirusów i skanerów IDS."
+                );
+        }
+    }
+
+    public static void showLevelIntroPopup(StackPane rootStack, int level, Runnable onClose) {
+        LevelEntry info = getLevelInfo(level);
+
+        StackPane backdrop = new StackPane();
+        backdrop.setStyle("-fx-background-color: rgba(0, 0, 0, 0.82);");
+        backdrop.setPadding(new Insets(40));
+
+        VBox card = new VBox(18);
+        card.setPadding(new Insets(35));
+        card.setPrefSize(620, 340);
+        card.setMinSize(620, 340);
+        card.setMaxSize(620, 340);
+        card.setAlignment(Pos.CENTER_LEFT);
+        card.setStyle(
+            "-fx-background-color: white;" +
+            "-fx-background-radius: 14;" +
+            "-fx-border-color: #adb5bd;" +
+            "-fx-border-radius: 14;" +
+            "-fx-border-width: 2;"
+        );
+
+        HBox topBadges = new HBox(12);
+        topBadges.setAlignment(Pos.CENTER_LEFT);
+
+        Label levelBadge = new Label("poziom " + info.levelNumber);
+        levelBadge.setPadding(new Insets(5, 14, 5, 14));
+        levelBadge.setFont(Font.font("System", FontWeight.BOLD, 13));
+        levelBadge.setStyle("-fx-background-color: #e7f5ff; -fx-text-fill: #1864ab; -fx-background-radius: 6;");
+
+        Label diffBadge = new Label(info.difficulty);
+        diffBadge.setPadding(new Insets(5, 14, 5, 14));
+        diffBadge.setFont(Font.font("System", FontWeight.BOLD, 13));
+        diffBadge.setStyle("-fx-background-color: #f8f9fa; -fx-text-fill: " + info.difficultyColor + "; -fx-background-radius: 6; -fx-border-color: " + info.difficultyColor + "; -fx-border-radius: 6;");
+
+        topBadges.getChildren().addAll(levelBadge, diffBadge);
+
+        Label titleLabel = new Label(info.title);
+        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 28));
+
+        Label descLabel = new Label(info.description);
+        descLabel.setWrapText(true);
+        descLabel.setFont(Font.font("System", 16));
+        descLabel.setStyle("-fx-text-fill: #343a40;");
+
+        Region spacer = new Region();
+        VBox.setVgrow(spacer, Priority.ALWAYS);
+
+        card.getChildren().addAll(topBadges, titleLabel, descLabel, spacer);
+
+        Button startBtn = new Button("rozpocznij obronę");
+        startBtn.setFont(Font.font("System", FontWeight.BOLD, 14));
+        startBtn.setMinSize(220, 45);
+        startBtn.setStyle("-fx-background-color: #1864ab; -fx-text-fill: white; -fx-background-radius: 8; -fx-cursor: hand;");
+        startBtn.setOnAction(e -> {
+            rootStack.getChildren().remove(backdrop);
+            if (onClose != null) onClose.run();
+        });
+
+        VBox container = new VBox(25, card, startBtn);
+        container.setAlignment(Pos.CENTER);
+        backdrop.getChildren().add(container);
+
+        rootStack.getChildren().add(backdrop);
+    }
 }
