@@ -2,16 +2,17 @@ package jpwp;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
 
-import javafx.animation.KeyFrame;
+import javafx.animation.AnimationTimer;
 import javafx.animation.PauseTransition;
-import javafx.animation.Timeline;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -52,6 +53,7 @@ public class GameScreen {
     private Queue<String> pendingDiscoveries = new LinkedList<>();
     private int pendingLevelIntro = 0;
     private boolean isPopupOpen = false;
+    private boolean isPaused = false;
 
     private List<WaveData> levelWaves = new ArrayList<>();
     private WaveData currentWaveData = null;
@@ -75,12 +77,15 @@ public class GameScreen {
 
     private List<Virus> activeViruses = new ArrayList<>();
     private List<Antivirus> activeTowers = new ArrayList<>();
-    
+    private Map<Antivirus, Double> towerTimers = new HashMap<>();
+
     private int[][] mapGrid = new int[12][12];
     private Rectangle[][] tilesGrid = new Rectangle[12][12];
     private Firewall[][] activeFirewalls = new Firewall[12][12];
-    private Timeline gameLoop;
+    private AnimationTimer gameLoop;
 
+    private double spawnTimer = 0.0;
+    private double firewallSecondTimer = 0.0;
     private int currentSpawnIndex = 0;
     private int[][] intersectionState = new int[12][12];
 
@@ -91,13 +96,14 @@ public class GameScreen {
     public Scene getScene(Stage primaryStage, Scene menuScene, int startLevel) {
         currentLevel = startLevel;
         hp = 100;
-        money = 15000 + (startLevel - 1) * 100;
+        money = 1500000 + (startLevel - 1) * 100;
         enemiesNeutralized = 0;
         gameSpeed = 1.0;
         discoveredItems.clear();
         pendingDiscoveries.clear();
         pendingLevelIntro = 0;
         isPopupOpen = false;
+        isPaused = false;
 
         StackPane rootStack = new StackPane();
         BorderPane root = new BorderPane();
@@ -107,7 +113,6 @@ public class GameScreen {
         rightPanel.setPadding(new Insets(16));
         rightPanel.setAlignment(Pos.TOP_CENTER);
         rightPanel.setStyle("-fx-background-color: #e0e0e0;");
-        
         rightPanel.setMinWidth(250);
         rightPanel.setPrefWidth(250);
 
@@ -119,10 +124,10 @@ public class GameScreen {
         waveLabel = new Label("fala: 0 / 0");
         hpLabel = new Label("hp: " + hp);
         moneyLabel = new Label("budzet: " + money + " pgCoinow");
-        
+
         Button buyFirewallBtn = new Button("kup firewall (koszt: 50)");
         buyFirewallBtn.setMinWidth(195);
-        
+
         Button buyTowerBtn = new Button("kup antywirus (koszt: 75)");
         buyTowerBtn.setMinWidth(195);
 
@@ -151,13 +156,13 @@ public class GameScreen {
         sellBtn.setMinWidth(175);
 
         inspectorBox.getChildren().addAll(inspectorTitleLabel, inspectorStatsLabel, upgradeBtn, sellBtn);
-        
+
         startWaveBtn = new Button("rozpocznij fale 1");
         startWaveBtn.setMinWidth(195);
 
         speedBtn = new Button("predkosc: x1");
         speedBtn.setMinWidth(195);
-        
+
         Button backButton = new Button("wroc do menu");
         backButton.setMinWidth(195);
 
@@ -176,16 +181,22 @@ public class GameScreen {
         GridPane gameBoard = new GridPane();
         gameBoard.setAlignment(Pos.CENTER);
 
+        Pane entitiesLayer = new Pane();
+        entitiesLayer.setMouseTransparent(true);
+        entitiesLayer.setPrefSize(14 * 45, 12 * 45);
+        entitiesLayer.setMaxSize(14 * 45, 12 * 45);
+        entitiesLayer.setMinSize(14 * 45, 12 * 45);
+
         Pane effectsLayer = new Pane();
         effectsLayer.setMouseTransparent(true);
         effectsLayer.setPrefSize(14 * 45, 12 * 45);
         effectsLayer.setMaxSize(14 * 45, 12 * 45);
         effectsLayer.setMinSize(14 * 45, 12 * 45);
 
-        StackPane boardContainer = new StackPane(gameBoard, effectsLayer);
+        StackPane boardContainer = new StackPane(gameBoard, entitiesLayer, effectsLayer);
         boardContainer.setPadding(new Insets(0, 40, 0, 40));
 
-        setupLevel(currentLevel, gameBoard, effectsLayer, buyFirewallBtn, buyTowerBtn, buyIdsBtn, rootStack);
+        setupLevel(currentLevel, gameBoard, entitiesLayer, effectsLayer, buyFirewallBtn, buyTowerBtn, buyIdsBtn, rootStack);
 
         upgradeBtn.setOnAction(e -> {
             if (selectedFirewall != null && selectedFirewall.canUpgrade()) {
@@ -224,6 +235,7 @@ public class GameScreen {
                 int ty = selectedTower.getY();
                 gameBoard.getChildren().remove(selectedTower.getGraphic());
                 activeTowers.remove(selectedTower);
+                towerTimers.remove(selectedTower);
                 mapGrid[ty][tx] = 2;
                 clearSelection();
             }
@@ -279,7 +291,7 @@ public class GameScreen {
                 if (currentLevel < maxLevels) {
                     currentLevel++;
                     money += 100;
-                    setupLevel(currentLevel, gameBoard, effectsLayer, buyFirewallBtn, buyTowerBtn, buyIdsBtn, rootStack);
+                    setupLevel(currentLevel, gameBoard, entitiesLayer, effectsLayer, buyFirewallBtn, buyTowerBtn, buyIdsBtn, rootStack);
                     processPopups(rootStack);
                 }
             } else if (!isWaveActive && waveNumber < levelWaves.size()) {
@@ -287,7 +299,9 @@ public class GameScreen {
                 waveNumber++;
                 isWaveActive = true;
                 spawnedInCurrentWave = 0;
-                
+                spawnTimer = 0.0;
+                currentSpawnIndex = 0;
+
                 waveLabel.setText("fala: " + waveNumber + " / " + levelWaves.size());
                 startWaveBtn.setText("trwa fala " + waveNumber + "...");
                 startWaveBtn.setDisable(true);
@@ -302,9 +316,6 @@ public class GameScreen {
                 gameSpeed = 1.0;
                 speedBtn.setText("predkosc: x1");
             }
-            if (gameLoop != null) {
-                gameLoop.setRate(gameSpeed);
-            }
         });
 
         backButton.setOnAction(e -> {
@@ -315,10 +326,10 @@ public class GameScreen {
         infoButton.setOnAction(e -> {
             if (!isPopupOpen && !discoveredItems.isEmpty()) {
                 isPopupOpen = true;
-                if (gameLoop != null) gameLoop.pause();
+                isPaused = true;
                 InfoOverlay.showCarousel(rootStack, discoveredItems, () -> {
                     isPopupOpen = false;
-                    if (gameLoop != null) gameLoop.play();
+                    isPaused = false;
                 });
             }
         });
@@ -327,168 +338,191 @@ public class GameScreen {
         root.setRight(rightPanel);
         root.setCenter(boardContainer);
 
-        gameLoop = new Timeline(new KeyFrame(Duration.seconds(1), e -> {
-            
-            for (int r = 0; r < 12; r++) {
-                for (int c = 0; c < 12; c++) {
-                    if (activeFirewalls[r][c] != null) {
-                        activeFirewalls[r][c].updateCooldown();
+        gameLoop = new AnimationTimer() {
+            private long lastNanoTime = -1;
+
+            @Override
+            public void handle(long now) {
+                if (lastNanoTime < 0) {
+                    lastNanoTime = now;
+                    return;
+                }
+
+                double dt = (now - lastNanoTime) / 1_000_000_000.0;
+                lastNanoTime = now;
+
+                if (dt > 0.1) dt = 0.1;
+                if (isPaused) return;
+
+                double scaledDt = dt * gameSpeed;
+
+                // 1. odliczanie cooldownu firewalli co 1 sekunde czasu gry
+                firewallSecondTimer += scaledDt;
+                if (firewallSecondTimer >= 1.0) {
+                    firewallSecondTimer -= 1.0;
+                    for (int r = 0; r < 12; r++) {
+                        for (int c = 0; c < 12; c++) {
+                            if (activeFirewalls[r][c] != null) {
+                                activeFirewalls[r][c].updateCooldown();
+                            }
+                        }
                     }
                 }
-            }
-            
-            List<Virus> toRemove = new ArrayList<>();
-            
-            for (Antivirus tower : activeTowers) {
-                for (Virus virus : activeViruses) {
-                    if (!toRemove.contains(virus) && tower.isInRange(virus.getX(), virus.getY())) {
-                        drawLaser(effectsLayer, tower.getX(), tower.getY(), virus.getX(), virus.getY(), tower.getLaserColor());
-                        virus.takeTowerDamage(tower.getBaseDamage(), tower.isIds());
-                        if (virus.getHp() <= 0) {
-                            gameBoard.getChildren().remove(virus.getGraphic());
-                            toRemove.add(virus);
-                            enemiesNeutralized++;
-                            money += virus.getReward();
-                            moneyLabel.setText("budzet: " + money + " pgCoinow");
-                        }
-                        break;
-                    }
-                }
-            }
 
-            for (Virus virus : activeViruses) {
-                if (toRemove.contains(virus)) continue;
+                List<Virus> toRemove = new ArrayList<>();
 
-                int steps = virus.getStepsPerTick();
-                int startVx = virus.getX();
-                int startVy = virus.getY();
-                boolean removedThisTurn = false;
-
-                for (int s = 0; s < steps; s++) {
-                    int vx = virus.getX();
-                    int vy = virus.getY();
-
-                    if (vx == 11) {
-                        gameBoard.getChildren().remove(virus.getGraphic());
-                        toRemove.add(virus);
-                        removedThisTurn = true;
-                        
-                        hp -= 10;
-                        hpLabel.setText("hp: " + hp);
-                        
-                        if (hp <= 0) {
-                            gameLoop.stop();
-                            showEndGameOverlay(rootStack, false, primaryStage, menuScene);
-                            return;
-                        }
-                        break;
-                    }
-
-                    boolean canUp = vy > 0 && (mapGrid[vy - 1][vx] == 1 || mapGrid[vy - 1][vx] == 3) && !virus.hasVisited(vx, vy - 1);
-                    boolean canDown = vy < 11 && (mapGrid[vy + 1][vx] == 1 || mapGrid[vy + 1][vx] == 3) && !virus.hasVisited(vx, vy + 1);
-                    boolean canRight = vx < 11 && (mapGrid[vy][vx + 1] == 1 || mapGrid[vy][vx + 1] == 3) && !virus.hasVisited(vx + 1, vy);
-                    boolean canLeft = vx > 0 && (mapGrid[vy][vx - 1] == 1 || mapGrid[vy][vx - 1] == 3) && !virus.hasVisited(vx - 1, vy);
-
-                    int nextX = vx;
-                    int nextY = vy;
-
-                    if (canRight) {
-                        nextX = vx + 1;
-                    } else if (canUp && canDown) {
-                        if (intersectionState[vy][vx] % 2 == 0) {
-                            nextY = vy - 1;
-                        } else {
-                            nextY = vy + 1;
-                        }
-                        intersectionState[vy][vx]++;
-                    } else if (canUp) {
-                        nextY = vy - 1;
-                    } else if (canDown) {
-                        nextY = vy + 1;
-                    } else if (canLeft) {
-                        nextX = vx - 1;
-                    }
-
-                    if (nextX != vx || nextY != vy) {
-                        if (mapGrid[nextY][nextX] == 3 && !virus.isFirewallImmune()) {
-                            Firewall fw = activeFirewalls[nextY][nextX];
-                            if (fw != null && !fw.isOnCooldown()) {
-                                fw.destroyEnemy();
-                                gameBoard.getChildren().remove(virus.getGraphic());
-                                toRemove.add(virus);
-                                enemiesNeutralized++;
-                                removedThisTurn = true;
+                // 2. strzelanie wiezyczek
+                for (Antivirus tower : activeTowers) {
+                    double timer = towerTimers.getOrDefault(tower, 1.0) + scaledDt;
+                    if (timer >= 1.0) {
+                        for (Virus virus : activeViruses) {
+                            if (!toRemove.contains(virus) && tower.isInRange(virus.getPixelX(), virus.getPixelY())) {
+                                drawLaser(effectsLayer, tower.getX(), tower.getY(), virus.getPixelX(), virus.getPixelY(), tower.getLaserColor());
+                                virus.takeTowerDamage(tower.getBaseDamage(), tower.isIds());
+                                timer = 0.0;
+                                if (virus.getHp() <= 0) {
+                                    entitiesLayer.getChildren().remove(virus.getGraphic());
+                                    toRemove.add(virus);
+                                    enemiesNeutralized++;
+                                    money += virus.getReward();
+                                    moneyLabel.setText("budzet: " + money + " pgCoinow");
+                                }
                                 break;
                             }
                         }
+                    }
+                    towerTimers.put(tower, timer);
+                }
 
-                        if (nextX > vx) virus.moveRight();
-                        else if (nextX < vx) virus.moveLeft();
-                        else if (nextY > vy) virus.moveDown();
-                        else if (nextY < vy) virus.moveUp();
-                    } else {
-                        break;
+                // 3. plynny ruch wszystkich wirusow po sciezce
+                for (Virus virus : activeViruses) {
+                    if (toRemove.contains(virus)) continue;
+
+                    if (!virus.hasTarget()) {
+                        int vx = virus.getX();
+                        int vy = virus.getY();
+
+                        if (vx == 11) {
+                            entitiesLayer.getChildren().remove(virus.getGraphic());
+                            toRemove.add(virus);
+
+                            hp -= 10;
+                            hpLabel.setText("hp: " + hp);
+
+                            if (hp <= 0) {
+                                gameLoop.stop();
+                                showEndGameOverlay(rootStack, false, primaryStage, menuScene);
+                                return;
+                            }
+                            continue;
+                        }
+
+                        int[] nextTile = chooseNextTile(virus, vx, vy);
+                        if (nextTile != null) {
+                            virus.setNextTarget(nextTile[0], nextTile[1]);
+                        }
+                    }
+
+                    boolean reachedTile = virus.moveTowardsTarget(dt, gameSpeed);
+                    if (reachedTile) {
+                        int cx = virus.getX();
+                        int cy = virus.getY();
+
+                        if (mapGrid[cy][cx] == 3 && !virus.isFirewallImmune()) {
+                            Firewall fw = activeFirewalls[cy][cx];
+                            if (fw != null && !fw.isOnCooldown()) {
+                                fw.destroyEnemy();
+                                entitiesLayer.getChildren().remove(virus.getGraphic());
+                                toRemove.add(virus);
+                                enemiesNeutralized++;
+                            }
+                        }
                     }
                 }
 
-                if (!removedThisTurn && (virus.getX() != startVx || virus.getY() != startVy)) {
-                    int totalDx = virus.getX() - startVx;
-                    int totalDy = virus.getY() - startVy;
-                    GridPane.setColumnIndex(virus.getGraphic(), virus.getX() + 1);
-                    GridPane.setRowIndex(virus.getGraphic(), virus.getY());
-                    virus.animateMove(totalDx, totalDy, gameSpeed);
-                }
-            }
-            activeViruses.removeAll(toRemove);
+                activeViruses.removeAll(toRemove);
 
-            if (isWaveActive && currentWaveData != null) {
-                List<EnemyType> sequence = currentWaveData.getEnemySequence();
-                if (spawnedInCurrentWave < sequence.size()) {
-                    List<Integer> spawns = new ArrayList<>();
-                    for (int r = 0; r < 12; r++) {
-                        if (mapGrid[r][0] == 1) spawns.add(r);
-                    }
-                    if (!spawns.isEmpty()) {
-                        int spawnY = spawns.get(currentSpawnIndex % spawns.size());
-                        currentSpawnIndex++;
+                // 4. sekwencyjny spawn po liniach wejsciowych (1, 2, 3...) z obsluga opoznienia 0 oraz X
+                if (isWaveActive && currentWaveData != null) {
+                    List<WaveData.SpawnStep> steps = currentWaveData.getSpawnSteps();
+                    if (spawnedInCurrentWave < steps.size()) {
+                        spawnTimer += scaledDt;
 
-                        EnemyType type = sequence.get(spawnedInCurrentWave);
-                        spawnedInCurrentWave++;
+                        List<Integer> spawns = new ArrayList<>();
+                        for (int r = 0; r < 12; r++) {
+                            if (mapGrid[r][0] == 1) spawns.add(r);
+                        }
 
-                        Virus virus = new Virus(0, spawnY, type);
-                        activeViruses.add(virus);
-                        gameBoard.add(virus.getGraphic(), virus.getX() + 1, virus.getY());
+                        while (spawnedInCurrentWave < steps.size()) {
+                            WaveData.SpawnStep currentStep = steps.get(spawnedInCurrentWave);
+                            if (spawnTimer < currentStep.getDelayBefore()) {
+                                break;
+                            }
 
-                        queueDiscovery(type.name(), rootStack);
-                    }
-                } else if (activeViruses.isEmpty()) {
-                    isWaveActive = false;
-                    
-                    if (waveNumber < levelWaves.size()) {
-                        startWaveBtn.setText("rozpocznij fale " + (waveNumber + 1));
-                        startWaveBtn.setDisable(false);
-                    } else {
-                        levelCompleted = true;
-                        if (currentLevel < maxLevels) {
-                            startWaveBtn.setText("przejdz do poziomu " + (currentLevel + 1));
+                            spawnTimer -= currentStep.getDelayBefore();
+                            spawnedInCurrentWave++;
+
+                            if (!spawns.isEmpty()) {
+                                int spawnY = spawns.get(currentSpawnIndex % spawns.size());
+                                currentSpawnIndex++;
+
+                                if (!currentStep.isPlaceholder()) {
+                                    EnemyType type = currentStep.getEnemyType();
+                                    Virus virus = new Virus(0, spawnY, type);
+                                    activeViruses.add(virus);
+                                    entitiesLayer.getChildren().add(virus.getGraphic());
+
+                                    queueDiscovery(type.name(), rootStack);
+                                }
+                            }
+                        }
+                    } else if (activeViruses.isEmpty()) {
+                        isWaveActive = false;
+
+                        if (waveNumber < levelWaves.size()) {
+                            startWaveBtn.setText("rozpocznij fale " + (waveNumber + 1));
                             startWaveBtn.setDisable(false);
                         } else {
-                            gameLoop.stop();
-                            showEndGameOverlay(rootStack, true, primaryStage, menuScene);
+                            levelCompleted = true;
+                            if (currentLevel < maxLevels) {
+                                startWaveBtn.setText("przejdz do poziomu " + (currentLevel + 1));
+                                startWaveBtn.setDisable(false);
+                            } else {
+                                gameLoop.stop();
+                                showEndGameOverlay(rootStack, true, primaryStage, menuScene);
+                            }
                         }
                     }
                 }
             }
-
-            updateVirusStacks();
-        }));
-        gameLoop.setCycleCount(Timeline.INDEFINITE);
-        gameLoop.setRate(gameSpeed);
-        gameLoop.play();
+        };
+        gameLoop.start();
 
         processPopups(rootStack);
 
         return new Scene(rootStack, 1000, 700);
+    }
+
+    private int[] chooseNextTile(Virus virus, int vx, int vy) {
+        boolean canUp = vy > 0 && (mapGrid[vy - 1][vx] == 1 || mapGrid[vy - 1][vx] == 3) && !virus.hasVisited(vx, vy - 1);
+        boolean canDown = vy < 11 && (mapGrid[vy + 1][vx] == 1 || mapGrid[vy + 1][vx] == 3) && !virus.hasVisited(vx, vy + 1);
+        boolean canRight = vx < 11 && (mapGrid[vy][vx + 1] == 1 || mapGrid[vy][vx + 1] == 3) && !virus.hasVisited(vx + 1, vy);
+        boolean canLeft = vx > 0 && (mapGrid[vy][vx - 1] == 1 || mapGrid[vy][vx - 1] == 3) && !virus.hasVisited(vx - 1, vy);
+
+        if (canRight) {
+            return new int[]{vx + 1, vy};
+        } else if (canUp && canDown) {
+            int nextY = (intersectionState[vy][vx] % 2 == 0) ? (vy - 1) : (vy + 1);
+            intersectionState[vy][vx]++;
+            return new int[]{vx, nextY};
+        } else if (canUp) {
+            return new int[]{vx, vy - 1};
+        } else if (canDown) {
+            return new int[]{vx, vy + 1};
+        } else if (canLeft) {
+            return new int[]{vx - 1, vy};
+        }
+        return null;
     }
 
     private void selectFirewall(Firewall fw) {
@@ -516,7 +550,7 @@ public class GameScreen {
             inspectorBox.setManaged(true);
             inspectorTitleLabel.setText("firewall (poz. " + selectedFirewall.getLevel() + ")");
             inspectorStatsLabel.setText("blokady: " + selectedFirewall.getMaxBlocks() + " | odnowienie: " + selectedFirewall.getCooldownDuration() + "s");
-            
+
             if (selectedFirewall.canUpgrade()) {
                 upgradeBtn.setText("ulepsz (" + selectedFirewall.getUpgradeCost() + " pgC)");
                 upgradeBtn.setDisable(false);
@@ -531,7 +565,7 @@ public class GameScreen {
             String name = selectedTower.isIds() ? "skaner IDS" : "antywirus";
             inspectorTitleLabel.setText(name + " (poz. " + selectedTower.getLevel() + ")");
             inspectorStatsLabel.setText("obrazenia: " + selectedTower.getBaseDamage() + " | zasieg: " + selectedTower.getRange());
-            
+
             if (selectedTower.canUpgrade()) {
                 upgradeBtn.setText("ulepsz (" + selectedTower.getUpgradeCost() + " pgC)");
                 upgradeBtn.setDisable(false);
@@ -602,7 +636,7 @@ public class GameScreen {
 
         if (pendingLevelIntro > 0) {
             isPopupOpen = true;
-            if (gameLoop != null) gameLoop.pause();
+            isPaused = true;
 
             int levelToShow = pendingLevelIntro;
             pendingLevelIntro = 0;
@@ -616,7 +650,7 @@ public class GameScreen {
 
         if (!pendingDiscoveries.isEmpty()) {
             isPopupOpen = true;
-            if (gameLoop != null) gameLoop.pause();
+            isPaused = true;
 
             String nextId = pendingDiscoveries.poll();
             InfoOverlay.CardEntry entry = InfoOverlay.getCardById(nextId);
@@ -628,19 +662,21 @@ public class GameScreen {
             return;
         }
 
-        if (gameLoop != null) {
-            gameLoop.play();
-        }
+        isPaused = false;
     }
 
-    private void setupLevel(int level, GridPane gameBoard, Pane effectsLayer, Button buyFirewallBtn, Button buyTowerBtn, Button buyIdsBtn, StackPane rootStack) {
+    private void setupLevel(int level, GridPane gameBoard, Pane entitiesLayer, Pane effectsLayer, Button buyFirewallBtn, Button buyTowerBtn, Button buyIdsBtn, StackPane rootStack) {
         gameBoard.getChildren().clear();
+        entitiesLayer.getChildren().clear();
         effectsLayer.getChildren().clear();
         activeViruses.clear();
         activeTowers.clear();
+        towerTimers.clear();
         activeFirewalls = new Firewall[12][12];
         intersectionState = new int[12][12];
         currentSpawnIndex = 0;
+        spawnTimer = 0.0;
+        firewallSecondTimer = 0.0;
         clearSelection();
 
         waveNumber = 0;
@@ -695,7 +731,7 @@ public class GameScreen {
                 internetBlock.setStroke(Color.BLACK);
                 gameBoard.add(internetBlock, 0, row);
             }
-            
+
             if (mapGrid[row][11] == 1) {
                 Rectangle serverBlock = new Rectangle(45, 45, Color.PURPLE);
                 serverBlock.setStrokeType(StrokeType.INSIDE);
@@ -707,7 +743,7 @@ public class GameScreen {
                 Rectangle tile = new Rectangle(45, 45);
                 tile.setStrokeType(StrokeType.INSIDE);
                 tilesGrid[row][col] = tile;
-                
+
                 if (mapGrid[row][col] == 1) {
                     tile.setFill(Color.DARKGRAY);
                 } else if (mapGrid[row][col] == 2) {
@@ -715,23 +751,23 @@ public class GameScreen {
                 } else {
                     tile.setFill(Color.WHITE);
                 }
-                
+
                 tile.setStroke(Color.TRANSPARENT);
                 tile.setStrokeWidth(1);
-                
+
                 final int finalRow = row;
                 final int finalCol = col;
-                
+
                 tile.setOnMouseClicked(e -> {
                     if (buyingType == 1 && mapGrid[finalRow][finalCol] == 1) {
                         money -= 50;
                         moneyLabel.setText("budzet: " + money + " pgCoinow");
                         buyingType = 0;
                         buyFirewallBtn.setText("kup firewall (koszt: 50)");
-                        
+
                         toggleHighlight(0);
                         mapGrid[finalRow][finalCol] = 3;
-                        
+
                         Firewall firewall = new Firewall(finalCol, finalRow);
                         firewall.getGraphic().setOnMouseClicked(ev -> {
                             if (buyingType == 0) selectFirewall(firewall);
@@ -746,59 +782,37 @@ public class GameScreen {
                         buyingType = 0;
                         buyTowerBtn.setText("kup antywirus (koszt: 75)");
                         buyIdsBtn.setText("kup skaner IDS (koszt: 90)");
-                        
+
                         toggleHighlight(0);
                         mapGrid[finalRow][finalCol] = 4;
-                        
+
                         Antivirus tower = new Antivirus(finalCol, finalRow, isIds);
                         tower.getGraphic().setOnMouseClicked(ev -> {
                             if (buyingType == 0) selectTower(tower);
                         });
                         activeTowers.add(tower);
+                        towerTimers.put(tower, 1.0);
                         gameBoard.add(tower.getGraphic(), finalCol + 1, finalRow);
                     } else if (buyingType == 0) {
                         clearSelection();
                     }
                 });
-                
+
                 gameBoard.add(tile, col + 1, row);
             }
         }
     }
 
-    private void updateVirusStacks() {
-        int[][] counts = new int[12][12];
-        for (Virus v : activeViruses) {
-            counts[v.getY()][v.getX()]++;
-        }
-
-        boolean[][] shown = new boolean[12][12];
-        for (Virus v : activeViruses) {
-            int vx = v.getX();
-            int vy = v.getY();
-            int count = counts[vy][vx];
-
-            if (!shown[vy][vx]) {
-                v.updateStackDisplay(count, true);
-                shown[vy][vx] = true;
-            } else {
-                v.updateStackDisplay(count, false);
-            }
-        }
-    }
-
-    private void drawLaser(Pane layer, int fromCol, int fromRow, int toCol, int toRow, Color laserColor) {
+    private void drawLaser(Pane layer, int fromCol, int fromRow, double targetPx, double targetPy, Color laserColor) {
         double startX = (fromCol + 1) * 45.0 + 22.5;
         double startY = fromRow * 45.0 + 22.5;
-        double endX = (toCol + 1) * 45.0 + 22.5;
-        double endY = toRow * 45.0 + 22.5;
 
-        Line laser = new Line(startX, startY, endX, endY);
+        Line laser = new Line(startX, startY, targetPx, targetPy);
         laser.setStroke(laserColor);
         laser.setStrokeWidth(3);
         layer.getChildren().add(laser);
 
-        PauseTransition pause = new PauseTransition(Duration.millis(200 / gameSpeed));
+        PauseTransition pause = new PauseTransition(Duration.millis(180 / gameSpeed));
         pause.setOnFinished(e -> layer.getChildren().remove(laser));
         pause.play();
     }
@@ -840,12 +854,25 @@ public class GameScreen {
                 if (line.isEmpty() || line.startsWith("#")) continue;
 
                 String[] tokens = line.split("\\s+");
-                List<EnemyType> seq = new ArrayList<>();
+                List<WaveData.SpawnStep> steps = new ArrayList<>();
+                Double customDelay = null;
+
                 for (String token : tokens) {
-                    seq.add(EnemyType.fromCode(token));
+                    try {
+                        customDelay = Double.parseDouble(token);
+                    } catch (NumberFormatException e) {
+                        double delayToUse = (customDelay != null) ? customDelay : (steps.isEmpty() ? 0.0 : 0.65);
+                        if (token.equalsIgnoreCase("X")) {
+                            steps.add(new WaveData.SpawnStep(null, delayToUse));
+                        } else {
+                            steps.add(new WaveData.SpawnStep(EnemyType.fromCode(token), delayToUse));
+                        }
+                        customDelay = null;
+                    }
                 }
-                if (!seq.isEmpty()) {
-                    levelWaves.add(new WaveData(seq));
+
+                if (!steps.isEmpty()) {
+                    levelWaves.add(new WaveData(steps));
                 }
             }
             scanner.close();

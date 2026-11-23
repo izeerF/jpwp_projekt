@@ -1,4 +1,4 @@
-V V V V
-V V T V V T
-T V T V T T
-V T T T V T T T
+V 0.8 V 0.8 V 0.8 V
+V 0.5 V 1.5 T 0.8 V 0.5 V 1.2 T
+T 1.2 V 0.5 T 1.2 V 0.6 T 0.6 T
+V 0.4 T 0.4 T 0.4 T 1.8 V 0.4 T 0.4 T 0.4 T

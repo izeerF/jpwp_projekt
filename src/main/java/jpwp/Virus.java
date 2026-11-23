@@ -1,64 +1,95 @@
 package jpwp;
 
-import javafx.animation.TranslateTransition;
 import javafx.scene.Node;
-import javafx.scene.control.Label;
 import javafx.scene.layout.StackPane;
-import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
-import javafx.util.Duration;
 
 public class Virus {
-    private int x;
-    private int y;
+    private int gridX;
+    private int gridY;
+    private int targetGridX;
+    private int targetGridY;
+    private boolean hasTarget;
+
+    private double pixelX;
+    private double pixelY;
+
     private int hp;
     private EnemyType type;
     private boolean[][] visited = new boolean[12][12];
     private StackPane graphic;
     private Circle body;
-    private Label stackLabel;
 
     public Virus(int startX, int startY, EnemyType type) {
-        this.x = startX;
-        this.y = startY;
+        this.gridX = startX;
+        this.gridY = startY;
+        this.targetGridX = startX;
+        this.targetGridY = startY;
+        this.hasTarget = false;
+
         this.type = type;
         this.hp = type.getMaxHp();
+
+        this.pixelX = (startX + 1) * 45.0 + 22.5;
+        this.pixelY = startY * 45.0 + 22.5;
 
         this.graphic = new StackPane();
         this.graphic.setPrefSize(45, 45);
         this.graphic.setMinSize(45, 45);
         this.graphic.setMaxSize(45, 45);
+        this.graphic.setLayoutX(pixelX - 22.5);
+        this.graphic.setLayoutY(pixelY - 22.5);
 
-        this.body = new Circle(16, type.getMainColor());
+        this.body = new Circle(15, type.getMainColor());
         this.body.setStroke(type.getStrokeColor());
         this.body.setStrokeWidth(2);
 
-        this.stackLabel = new Label("");
-        this.stackLabel.setTextFill(Color.WHITE);
-        this.stackLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
-        this.stackLabel.setVisible(false);
-
-        this.graphic.getChildren().addAll(body, stackLabel);
+        this.graphic.getChildren().add(body);
 
         if (startX >= 0 && startX < 12 && startY >= 0 && startY < 12) {
             this.visited[startY][startX] = true;
         }
     }
 
-    public void updateStackDisplay(int count, boolean isTopOfStack) {
-        if (!isTopOfStack) {
-            this.graphic.setVisible(false);
-        } else {
-            this.graphic.setVisible(true);
-            if (count > 1) {
-                this.stackLabel.setText("x" + count);
-                this.stackLabel.setVisible(true);
-            } else {
-                this.stackLabel.setVisible(false);
-            }
+    public void setNextTarget(int nextCol, int nextRow) {
+        this.targetGridX = nextCol;
+        this.targetGridY = nextRow;
+        this.hasTarget = true;
+        if (nextCol >= 0 && nextCol < 12 && nextRow >= 0 && nextRow < 12) {
+            this.visited[nextRow][nextCol] = true;
         }
+    }
+
+    public boolean moveTowardsTarget(double dtSeconds, double speedMultiplier) {
+        if (!hasTarget) return true;
+
+        double targetPx = (targetGridX + 1) * 45.0 + 22.5;
+        double targetPy = targetGridY * 45.0 + 22.5;
+
+        double dx = targetPx - pixelX;
+        double dy = targetPy - pixelY;
+        double dist = Math.hypot(dx, dy);
+        double step = type.getSpeedPxPerSec() * speedMultiplier * dtSeconds;
+
+        if (dist <= step) {
+            pixelX = targetPx;
+            pixelY = targetPy;
+            gridX = targetGridX;
+            gridY = targetGridY;
+            hasTarget = false;
+            updateGraphicPosition();
+            return true;
+        } else {
+            pixelX += (dx / dist) * step;
+            pixelY += (dy / dist) * step;
+            updateGraphicPosition();
+            return false;
+        }
+    }
+
+    private void updateGraphicPosition() {
+        this.graphic.setLayoutX(pixelX - 22.5);
+        this.graphic.setLayoutY(pixelY - 22.5);
     }
 
     public void takeTowerDamage(int baseAmount, boolean fromIds) {
@@ -66,7 +97,7 @@ public class Virus {
         int actualDamage = (int) Math.round(baseAmount * mult);
         if (actualDamage < 1) actualDamage = 1;
         this.hp -= actualDamage;
-        
+
         double ratio = (double) this.hp / type.getMaxHp();
         if (ratio <= 0.35) {
             this.body.setOpacity(0.5);
@@ -76,41 +107,22 @@ public class Virus {
     }
 
     public boolean isFirewallImmune() { return type.isFirewallImmune(); }
-    public int getStepsPerTick() { return type.getStepsPerTick(); }
     public int getHp() { return hp; }
     public int getReward() { return type.getReward(); }
     public EnemyType getType() { return type; }
+    public boolean hasTarget() { return hasTarget; }
 
-    public void moveRight() { x += 1; markVisited(); }
-    public void moveLeft() { x -= 1; markVisited(); }
-    public void moveUp() { y -= 1; markVisited(); }
-    public void moveDown() { y += 1; markVisited(); }
+    public int getX() { return gridX; }
+    public int getY() { return gridY; }
+    public double getPixelX() { return pixelX; }
+    public double getPixelY() { return pixelY; }
 
-    public void animateMove(int deltaX, int deltaY, double speedMultiplier) {
-        graphic.setTranslateX(-deltaX * 45);
-        graphic.setTranslateY(-deltaY * 45);
-
-        TranslateTransition tt = new TranslateTransition(Duration.millis(350 / speedMultiplier), graphic);
-        tt.setToX(0);
-        tt.setToY(0);
-        tt.play();
-    }
-
-    private void markVisited() {
-        if (x >= 0 && x < 12 && y >= 0 && y < 12) {
-            visited[y][x] = true;
-        }
-    }
-
-    public int getX() { return x; }
-    public int getY() { return y; }
-    
     public boolean hasVisited(int vx, int vy) {
         if (vx >= 0 && vx < 12 && vy >= 0 && vy < 12) {
             return visited[vy][vx];
         }
         return false;
     }
-    
+
     public Node getGraphic() { return graphic; }
 }

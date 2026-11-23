@@ -3,9 +3,9 @@ package jpwp;
 import javafx.scene.paint.Color;
 
 public enum EnemyType {
-    V("Virus", 30, 15, Color.GREEN, Color.DARKGREEN, 1.0, 0.5, false, 1),
-    T("Trojan", 45, 25, Color.DARKORANGE, Color.BROWN, 0.6, 2.0, true, 1),
-    W("Worm", 40, 20, Color.MAGENTA, Color.DARKMAGENTA, 1.2, 0.25, false, 2);
+    V("Virus", 30, 15, Color.GREEN, Color.DARKGREEN, 1.0, 0.5, false, 55.0),
+    T("Trojan", 45, 25, Color.DARKORANGE, Color.BROWN, 0.6, 2.0, true, 45.0),
+    W("Worm", 40, 20, Color.MAGENTA, Color.DARKMAGENTA, 1.2, 0.25, false, 105.0);
 
     private final String displayName;
     private final int maxHp;
@@ -15,11 +15,11 @@ public enum EnemyType {
     private final double antivirusDamageMultiplier;
     private final double idsDamageMultiplier;
     private final boolean firewallImmune;
-    private final int stepsPerTick;
+    private final double speedPxPerSec;
 
     EnemyType(String displayName, int maxHp, int reward, Color mainColor, Color strokeColor,
               double antivirusDamageMultiplier, double idsDamageMultiplier,
-              boolean firewallImmune, int stepsPerTick) {
+              boolean firewallImmune, double speedPxPerSec) {
         this.displayName = displayName;
         this.maxHp = maxHp;
         this.reward = reward;
@@ -28,7 +28,7 @@ public enum EnemyType {
         this.antivirusDamageMultiplier = antivirusDamageMultiplier;
         this.idsDamageMultiplier = idsDamageMultiplier;
         this.firewallImmune = firewallImmune;
-        this.stepsPerTick = stepsPerTick;
+        this.speedPxPerSec = speedPxPerSec;
     }
 
     public String getDisplayName() { return displayName; }
@@ -39,7 +39,7 @@ public enum EnemyType {
     public double getAntivirusDamageMultiplier() { return antivirusDamageMultiplier; }
     public double getIdsDamageMultiplier() { return idsDamageMultiplier; }
     public boolean isFirewallImmune() { return firewallImmune; }
-    public int getStepsPerTick() { return stepsPerTick; }
+    public double getSpeedPxPerSec() { return speedPxPerSec; }
 
     public static EnemyType fromCode(String code) {
         try {

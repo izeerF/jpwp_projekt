@@ -1,4 +1,4 @@
-V V T V W
-T W V V T W
-W T T W V T W
-T W T W T W T W
+V 0.8 V 1.2 T 0 W
+T 0 V 1.2 X 0 W 0.8 V 0 T
+W 0.6 X 0 T 1.5 V 0 W 0.8 T 0 T
+T 0 W 0.6 V 0 T 1.2 W 0 W 0.6 T 0 W

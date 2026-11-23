@@ -95,10 +95,11 @@ public class Antivirus {
         return totalInvested / 2;
     }
 
-    public boolean isInRange(int targetX, int targetY) {
-        int dx = Math.abs(this.x - targetX);
-        int dy = Math.abs(this.y - targetY);
-        return dx <= range && dy <= range;
+public boolean isInRange(double targetPixelX, double targetPixelY) {
+        double towerPx = (this.x + 1) * 45.0 + 22.5;
+        double towerPy = this.y * 45.0 + 22.5;
+        double maxDistPx = (range + 0.5) * 45.0;
+        return Math.hypot(towerPx - targetPixelX, towerPy - targetPixelY) <= maxDistPx;
     }
 
     public int getLevel() { return level; }
