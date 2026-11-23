@@ -3,9 +3,10 @@ package jpwp;
 import javafx.scene.paint.Color;
 
 public enum EnemyType {
-    V("Virus", 30, 15, Color.GREEN, Color.DARKGREEN, 1.0, 0.5, false, 55.0),
-    T("Trojan", 45, 25, Color.DARKORANGE, Color.BROWN, 0.6, 2.0, true, 45.0),
-    W("Worm", 40, 20, Color.MAGENTA, Color.DARKMAGENTA, 1.2, 0.25, false, 105.0);
+    V("Virus", 30, 15, Color.GREEN, Color.DARKGREEN, 1.0, 0.5, 0.4, false, 55.0),
+    T("Trojan", 45, 25, Color.DARKORANGE, Color.BROWN, 0.6, 2.0, 0.5, true, 45.0),
+    W("Worm", 40, 20, Color.MAGENTA, Color.DARKMAGENTA, 1.2, 0.25, 0.3, false, 105.0),
+    R("Ransomware", 85, 40, Color.CRIMSON, Color.BLACK, 0.2, 0.2, 2.5, true, 35.0);
 
     private final String displayName;
     private final int maxHp;
@@ -14,11 +15,12 @@ public enum EnemyType {
     private final Color strokeColor;
     private final double antivirusDamageMultiplier;
     private final double idsDamageMultiplier;
+    private final double decryptorDamageMultiplier;
     private final boolean firewallImmune;
     private final double speedPxPerSec;
 
     EnemyType(String displayName, int maxHp, int reward, Color mainColor, Color strokeColor,
-              double antivirusDamageMultiplier, double idsDamageMultiplier,
+              double antivirusDamageMultiplier, double idsDamageMultiplier, double decryptorDamageMultiplier,
               boolean firewallImmune, double speedPxPerSec) {
         this.displayName = displayName;
         this.maxHp = maxHp;
@@ -27,6 +29,7 @@ public enum EnemyType {
         this.strokeColor = strokeColor;
         this.antivirusDamageMultiplier = antivirusDamageMultiplier;
         this.idsDamageMultiplier = idsDamageMultiplier;
+        this.decryptorDamageMultiplier = decryptorDamageMultiplier;
         this.firewallImmune = firewallImmune;
         this.speedPxPerSec = speedPxPerSec;
     }
@@ -38,6 +41,7 @@ public enum EnemyType {
     public Color getStrokeColor() { return strokeColor; }
     public double getAntivirusDamageMultiplier() { return antivirusDamageMultiplier; }
     public double getIdsDamageMultiplier() { return idsDamageMultiplier; }
+    public double getDecryptorDamageMultiplier() { return decryptorDamageMultiplier; }
     public boolean isFirewallImmune() { return firewallImmune; }
     public double getSpeedPxPerSec() { return speedPxPerSec; }
 

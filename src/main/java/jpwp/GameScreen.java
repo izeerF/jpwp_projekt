@@ -37,6 +37,8 @@ import javafx.util.Duration;
 
 public class GameScreen {
 
+    private static final Set<String> discoveredItems = new HashSet<>();
+
     private int currentLevel = 1;
     private final int maxLevels = 3;
     private boolean levelCompleted = false;
@@ -49,7 +51,6 @@ public class GameScreen {
     private int spawnedInCurrentWave = 0;
     private double gameSpeed = 1.0;
 
-    private Set<String> discoveredItems = new HashSet<>();
     private Queue<String> pendingDiscoveries = new LinkedList<>();
     private int pendingLevelIntro = 0;
     private boolean isPopupOpen = false;
@@ -58,7 +59,7 @@ public class GameScreen {
     private List<WaveData> levelWaves = new ArrayList<>();
     private WaveData currentWaveData = null;
 
-    private int buyingType = 0; // 0 - nic, 1 - firewall, 2 - antivirus, 3 - ids
+    private int buyingType = 0; // 0 - nic, 1 - firewall, 2 - antivirus, 3 - ids, 4 - dekryptor (sandbox)
     private Label levelTitleLabel;
     private Label levelLabel;
     private Label hpLabel;
@@ -96,10 +97,9 @@ public class GameScreen {
     public Scene getScene(Stage primaryStage, Scene menuScene, int startLevel) {
         currentLevel = startLevel;
         hp = 100;
-        money = 1500000 + (startLevel - 1) * 100;
+        money = 150 + (startLevel - 1) * 100;
         enemiesNeutralized = 0;
         gameSpeed = 1.0;
-        discoveredItems.clear();
         pendingDiscoveries.clear();
         pendingLevelIntro = 0;
         isPopupOpen = false;
@@ -109,8 +109,8 @@ public class GameScreen {
         BorderPane root = new BorderPane();
         rootStack.getChildren().add(root);
 
-        VBox rightPanel = new VBox(10);
-        rightPanel.setPadding(new Insets(16));
+        VBox rightPanel = new VBox(8);
+        rightPanel.setPadding(new Insets(14));
         rightPanel.setAlignment(Pos.TOP_CENTER);
         rightPanel.setStyle("-fx-background-color: #e0e0e0;");
         rightPanel.setMinWidth(250);
@@ -134,8 +134,11 @@ public class GameScreen {
         Button buyIdsBtn = new Button("kup skaner IDS (koszt: 90)");
         buyIdsBtn.setMinWidth(195);
 
+        Button buyDecBtn = new Button("kup sandbox (koszt: 110)");
+        buyDecBtn.setMinWidth(195);
+
         inspectorBox = new VBox(6);
-        inspectorBox.setPadding(new Insets(10));
+        inspectorBox.setPadding(new Insets(8));
         inspectorBox.setAlignment(Pos.CENTER);
         inspectorBox.setMaxWidth(195);
         inspectorBox.setStyle("-fx-background-color: #f8f9fa; -fx-background-radius: 6; -fx-border-color: #adb5bd; -fx-border-radius: 6;");
@@ -196,7 +199,7 @@ public class GameScreen {
         StackPane boardContainer = new StackPane(gameBoard, entitiesLayer, effectsLayer);
         boardContainer.setPadding(new Insets(0, 40, 0, 40));
 
-        setupLevel(currentLevel, gameBoard, entitiesLayer, effectsLayer, buyFirewallBtn, buyTowerBtn, buyIdsBtn, rootStack);
+        setupLevel(currentLevel, gameBoard, entitiesLayer, effectsLayer, buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn, rootStack);
 
         upgradeBtn.setOnAction(e -> {
             if (selectedFirewall != null && selectedFirewall.canUpgrade()) {
@@ -245,13 +248,12 @@ public class GameScreen {
             clearSelection();
             if (buyingType == 1) {
                 buyingType = 0;
-                buyFirewallBtn.setText("kup firewall (koszt: 50)");
+                resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
                 toggleHighlight(0);
             } else if (money >= 50) {
                 buyingType = 1;
+                resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
                 buyFirewallBtn.setText("anuluj");
-                buyTowerBtn.setText("kup antywirus (koszt: 75)");
-                buyIdsBtn.setText("kup skaner IDS (koszt: 90)");
                 toggleHighlight(1);
             }
         });
@@ -260,28 +262,42 @@ public class GameScreen {
             clearSelection();
             if (buyingType == 2) {
                 buyingType = 0;
-                buyTowerBtn.setText("kup antywirus (koszt: 75)");
+                resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
                 toggleHighlight(0);
             } else if (money >= 75) {
                 buyingType = 2;
+                resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
                 buyTowerBtn.setText("anuluj");
-                buyFirewallBtn.setText("kup firewall (koszt: 50)");
-                buyIdsBtn.setText("kup skaner IDS (koszt: 90)");
                 toggleHighlight(2);
             }
         });
 
         buyIdsBtn.setOnAction(e -> {
+            if (currentLevel < 2) return;
             clearSelection();
             if (buyingType == 3) {
                 buyingType = 0;
-                buyIdsBtn.setText("kup skaner IDS (koszt: 90)");
+                resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
                 toggleHighlight(0);
             } else if (money >= 90) {
                 buyingType = 3;
+                resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
                 buyIdsBtn.setText("anuluj");
-                buyFirewallBtn.setText("kup firewall (koszt: 50)");
-                buyTowerBtn.setText("kup antywirus (koszt: 75)");
+                toggleHighlight(2);
+            }
+        });
+
+        buyDecBtn.setOnAction(e -> {
+            if (currentLevel < 3) return;
+            clearSelection();
+            if (buyingType == 4) {
+                buyingType = 0;
+                resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
+                toggleHighlight(0);
+            } else if (money >= 110) {
+                buyingType = 4;
+                resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
+                buyDecBtn.setText("anuluj");
                 toggleHighlight(2);
             }
         });
@@ -291,7 +307,7 @@ public class GameScreen {
                 if (currentLevel < maxLevels) {
                     currentLevel++;
                     money += 100;
-                    setupLevel(currentLevel, gameBoard, entitiesLayer, effectsLayer, buyFirewallBtn, buyTowerBtn, buyIdsBtn, rootStack);
+                    setupLevel(currentLevel, gameBoard, entitiesLayer, effectsLayer, buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn, rootStack);
                     processPopups(rootStack);
                 }
             } else if (!isWaveActive && waveNumber < levelWaves.size()) {
@@ -334,7 +350,7 @@ public class GameScreen {
             }
         });
 
-        rightPanel.getChildren().addAll(levelTitleLabel, levelLabel, waveLabel, hpLabel, moneyLabel, buyFirewallBtn, buyTowerBtn, buyIdsBtn, inspectorBox, startWaveBtn, speedBtn, backButton, spacer, bottomControls);
+        rightPanel.getChildren().addAll(levelTitleLabel, levelLabel, waveLabel, hpLabel, moneyLabel, buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn, inspectorBox, startWaveBtn, speedBtn, backButton, spacer, bottomControls);
         root.setRight(rightPanel);
         root.setCenter(boardContainer);
 
@@ -356,7 +372,6 @@ public class GameScreen {
 
                 double scaledDt = dt * gameSpeed;
 
-                // 1. odliczanie cooldownu firewalli co 1 sekunde czasu gry
                 firewallSecondTimer += scaledDt;
                 if (firewallSecondTimer >= 1.0) {
                     firewallSecondTimer -= 1.0;
@@ -371,14 +386,13 @@ public class GameScreen {
 
                 List<Virus> toRemove = new ArrayList<>();
 
-                // 2. strzelanie wiezyczek
                 for (Antivirus tower : activeTowers) {
                     double timer = towerTimers.getOrDefault(tower, 1.0) + scaledDt;
                     if (timer >= 1.0) {
                         for (Virus virus : activeViruses) {
                             if (!toRemove.contains(virus) && tower.isInRange(virus.getPixelX(), virus.getPixelY())) {
                                 drawLaser(effectsLayer, tower.getX(), tower.getY(), virus.getPixelX(), virus.getPixelY(), tower.getLaserColor());
-                                virus.takeTowerDamage(tower.getBaseDamage(), tower.isIds());
+                                virus.takeTowerDamage(tower.getBaseDamage(), tower.getTowerType());
                                 timer = 0.0;
                                 if (virus.getHp() <= 0) {
                                     entitiesLayer.getChildren().remove(virus.getGraphic());
@@ -394,7 +408,6 @@ public class GameScreen {
                     towerTimers.put(tower, timer);
                 }
 
-                // 3. plynny ruch wszystkich wirusow po sciezce
                 for (Virus virus : activeViruses) {
                     if (toRemove.contains(virus)) continue;
 
@@ -442,7 +455,6 @@ public class GameScreen {
 
                 activeViruses.removeAll(toRemove);
 
-                // 4. sekwencyjny spawn po liniach wejsciowych (1, 2, 3...) z obsluga opoznienia 0 oraz X
                 if (isWaveActive && currentWaveData != null) {
                     List<WaveData.SpawnStep> steps = currentWaveData.getSpawnSteps();
                     if (spawnedInCurrentWave < steps.size()) {
@@ -501,6 +513,13 @@ public class GameScreen {
         processPopups(rootStack);
 
         return new Scene(rootStack, 1000, 700);
+    }
+
+private void resetBuyButtons(Button buyFirewallBtn, Button buyTowerBtn, Button buyIdsBtn, Button buyDecBtn) {
+        buyFirewallBtn.setText("kup firewall (koszt: 50)");
+        buyTowerBtn.setText("kup antywirus (koszt: 75)");
+        buyIdsBtn.setText(currentLevel >= 2 ? "kup skaner IDS (koszt: 90)" : "skaner IDS (poziom 2)");
+        buyDecBtn.setText(currentLevel >= 3 ? "kup dekryptor (koszt: 110)" : "dekryptor (poziom 3)");
     }
 
     private int[] chooseNextTile(Virus virus, int vx, int vy) {
@@ -562,7 +581,7 @@ public class GameScreen {
         } else if (selectedTower != null) {
             inspectorBox.setVisible(true);
             inspectorBox.setManaged(true);
-            String name = selectedTower.isIds() ? "skaner IDS" : "antywirus";
+            String name = selectedTower.getTowerType().getDisplayName();
             inspectorTitleLabel.setText(name + " (poz. " + selectedTower.getLevel() + ")");
             inspectorStatsLabel.setText("obrazenia: " + selectedTower.getBaseDamage() + " | zasieg: " + selectedTower.getRange());
 
@@ -665,7 +684,7 @@ public class GameScreen {
         isPaused = false;
     }
 
-    private void setupLevel(int level, GridPane gameBoard, Pane entitiesLayer, Pane effectsLayer, Button buyFirewallBtn, Button buyTowerBtn, Button buyIdsBtn, StackPane rootStack) {
+    private void setupLevel(int level, GridPane gameBoard, Pane entitiesLayer, Pane effectsLayer, Button buyFirewallBtn, Button buyTowerBtn, Button buyIdsBtn, Button buyDecBtn, StackPane rootStack) {
         gameBoard.getChildren().clear();
         entitiesLayer.getChildren().clear();
         effectsLayer.getChildren().clear();
@@ -699,10 +718,16 @@ public class GameScreen {
             }
         }
 
+        // progresywne odblokowywanie wiezyczek i ich wpisow w encyklopedii
         queueDiscovery("FW", rootStack);
         if (hasTowerTiles) {
             queueDiscovery("AV", rootStack);
-            queueDiscovery("IDS", rootStack);
+            if (level >= 2) {
+                queueDiscovery("IDS", rootStack);
+            }
+            if (level >= 3) {
+                queueDiscovery("DEC", rootStack);
+            }
         }
 
         InfoOverlay.LevelEntry levelInfo = InfoOverlay.getLevelInfo(level);
@@ -710,11 +735,10 @@ public class GameScreen {
         levelLabel.setText("poziom: " + level + " / " + maxLevels);
         waveLabel.setText("fala: 0 / " + levelWaves.size());
         moneyLabel.setText("budzet: " + money + " pgCoinow");
-        buyFirewallBtn.setText("kup firewall (koszt: 50)");
-        buyTowerBtn.setText("kup antywirus (koszt: 75)");
-        buyIdsBtn.setText("kup skaner IDS (koszt: 90)");
+        resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
         buyTowerBtn.setDisable(!hasTowerTiles);
-        buyIdsBtn.setDisable(!hasTowerTiles);
+        buyIdsBtn.setDisable(!hasTowerTiles || level < 2);
+        buyDecBtn.setDisable(!hasTowerTiles || level < 3);
 
         if (levelWaves.isEmpty()) {
             startWaveBtn.setText("brak fal w pliku");
@@ -763,7 +787,7 @@ public class GameScreen {
                         money -= 50;
                         moneyLabel.setText("budzet: " + money + " pgCoinow");
                         buyingType = 0;
-                        buyFirewallBtn.setText("kup firewall (koszt: 50)");
+                        resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
 
                         toggleHighlight(0);
                         mapGrid[finalRow][finalCol] = 3;
@@ -774,25 +798,32 @@ public class GameScreen {
                         });
                         activeFirewalls[finalRow][finalCol] = firewall;
                         gameBoard.add(firewall.getGraphic(), finalCol + 1, finalRow);
-                    } else if ((buyingType == 2 || buyingType == 3) && mapGrid[finalRow][finalCol] == 2) {
-                        boolean isIds = (buyingType == 3);
-                        int cost = isIds ? 90 : 75;
-                        money -= cost;
+                    } else if (buyingType >= 2 && buyingType <= 4 && mapGrid[finalRow][finalCol] == 2) {
+                        Antivirus.TowerType chosenType;
+                        if (buyingType == 3 && currentLevel >= 2) {
+                            chosenType = Antivirus.TowerType.IDS;
+                        } else if (buyingType == 4 && currentLevel >= 3) {
+                            chosenType = Antivirus.TowerType.DEC;
+                        } else {
+                            chosenType = Antivirus.TowerType.AV;
+                        }
+
+                        money -= chosenType.getCost();
                         moneyLabel.setText("budzet: " + money + " pgCoinow");
                         buyingType = 0;
-                        buyTowerBtn.setText("kup antywirus (koszt: 75)");
-                        buyIdsBtn.setText("kup skaner IDS (koszt: 90)");
+                        resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
 
                         toggleHighlight(0);
                         mapGrid[finalRow][finalCol] = 4;
 
-                        Antivirus tower = new Antivirus(finalCol, finalRow, isIds);
+                        Antivirus tower = new Antivirus(finalCol, finalRow, chosenType);
                         tower.getGraphic().setOnMouseClicked(ev -> {
                             if (buyingType == 0) selectTower(tower);
                         });
                         activeTowers.add(tower);
                         towerTimers.put(tower, 1.0);
                         gameBoard.add(tower.getGraphic(), finalCol + 1, finalRow);
+                        queueDiscovery(chosenType.name(), rootStack);
                     } else if (buyingType == 0) {
                         clearSelection();
                     }

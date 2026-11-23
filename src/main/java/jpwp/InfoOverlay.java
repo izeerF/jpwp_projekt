@@ -16,6 +16,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.shape.Polygon;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.StrokeType;
 import javafx.scene.text.Font;
@@ -84,9 +85,22 @@ public class InfoOverlay {
             "worm / robak (kod: W)",
             "hp: 40 | prędkość: podwójna (x2) | nagroda: 20 pgCoinów",
             "autonomiczny program błyskawicznie rozprzestrzeniający się po łączach sieciowych.",
-            "porusza się dwa pola na turę i ignoruje skanery IDS (75% redukcji obrażeń).",
+            "porusza się dwa razy szybciej i ignoruje skanery IDS (75% redukcji obrażeń).",
             "zostaje zatrzymany przez firewall oraz dostaje zwiększone obrażenia od antywirusa.",
             "w rzeczywistości: robak sieciowy (np. WannaCry) samoczynnie skanuje sieć i wykorzystuje luki w protokołach do błyskawicznego przeskakiwania między węzłami."
+        ));
+
+        Circle ransomIcon = new Circle(28, Color.CRIMSON);
+        ransomIcon.setStroke(Color.BLACK);
+        ransomIcon.setStrokeWidth(3);
+        list.add(new CardEntry(
+            "R", "nowy przeciwnik", ransomIcon,
+            "ransomware (kod: R)",
+            "hp: 85 | prędkość: niska | nagroda: 40 pgCoinów",
+            "złośliwe oprogramowanie szyfrujące zasoby serwera i blokujące dostęp do plików.",
+            "bardzo wysokie hp, omija firewall oraz ignoruje zwykły antywirus i IDS (80% redukcji obrażeń).",
+            "bardzo podatny na moduły deszyfrujące (dekryptor - 250% obrażeń).",
+            "w rzeczywistości: ataki ransomware (np. LockBit) szyfrują dyski firmowe i żądają okupu; kluczowe jest izolowanie ładunków w piaskownicy (sandbox) i dekrypcja."
         ));
 
         Rectangle fwIcon = new Rectangle(52, 52, Color.RED);
@@ -99,7 +113,7 @@ public class InfoOverlay {
             "pojemność: 5 blokad | czas odnowienia: 5s",
             "zapora sieciowa stawiana bezpośrednio na trasie przesyłu danych.",
             "natychmiastowo neutralizuje wirusy oraz szybkie robaki bez względu na ich hp.",
-            "przeciąża się po 5 blokadach i jest bezradny wobec zamaskowanych trojanów.",
+            "przeciąża się po 5 blokadach i jest bezradny wobec trojanów oraz ransomware.",
             "w rzeczywistości: zapora sieciowa filtrująca pakiety na podstawie reguł (np. portów i adresów ip), może zostać zapchana przy zbyt dużym ruchu."
         ));
 
@@ -115,7 +129,7 @@ public class InfoOverlay {
             "obrażenia: 10 | zasięg: 2 pola",
             "aktywny skaner analizujący pliki i ruch w promieniu dwóch kratek wokół węzła.",
             "nie przeciąża się, skuteczny przeciwko wirusom oraz szybkim robakom (120% obrażeń).",
-            "słabszy przeciwko dobrze zamaskowanym trojanom (60% obrażeń).",
+            "słabszy przeciwko trojanom (60% obrażeń) oraz ransomware (20% obrażeń).",
             "w rzeczywistości: oprogramowanie antywirusowe analizujące sygnatury i zachowanie plików wewnątrz stacji roboczych."
         ));
 
@@ -134,8 +148,30 @@ public class InfoOverlay {
             "obrażenia: 12 | zasięg: 3 pola",
             "zaawansowany system głębokiej inspekcji pakietów (Deep Packet Inspection) o dużym zasięgu.",
             "demaskuje trojany i zadaje im podwójne obrażenia (200%), duży zasięg 3 kratek.",
-            "nieskuteczny przeciwko szybkim robakom i podstawowym wirusom.",
+            "nieskuteczny przeciwko szybkim robakom, wirusom oraz ransomware.",
             "w rzeczywistości: Intrusion Detection System analizuje anomalie w ruchu sieciowym, wykrywając ukryte tunele i trojany omijające zwykły firewall."
+        ));
+
+        StackPane decIcon = new StackPane();
+        Polygon decDiamond = new Polygon(
+            26.0, 2.0,
+            50.0, 26.0,
+            26.0, 50.0,
+            2.0, 26.0
+        );
+        decDiamond.setFill(Color.INDIGO);
+        decDiamond.setStroke(Color.MEDIUMORCHID);
+        decDiamond.setStrokeWidth(3);
+        Circle decCore = new Circle(10, Color.PLUM);
+        decIcon.getChildren().addAll(decDiamond, decCore);
+        list.add(new CardEntry(
+            "DEC", "nowa wieżyczka", decIcon,
+            "dekryptor (koszt: 110 pgCoinów)",
+            "obrażenia: 22 | zasięg: 2 pola",
+            "izolowana piaskownica (sandbox) łamiąca klucze szyfrujące złośliwych pakietów.",
+            "zadaje krytyczne obrażenia (250%) przeciwko ransomware.",
+            "wysoki koszt budowy i niska skuteczność przeciwko zwykłym wirusom oraz robakom.",
+            "w rzeczywistości: systemy Sandbox i narzędzia deszyfrujące (np. No More Ransom) analizują algorytmy szyfrujące i neutralizują ataki ransomware."
         ));
 
         return list;
@@ -317,6 +353,7 @@ public class InfoOverlay {
         card.getChildren().addAll(header, roleLabel, prosLabel, consLabel, spacer, realWorldLabel);
         return card;
     }
+
     public static class LevelEntry {
         int levelNumber;
         String title;
@@ -358,7 +395,7 @@ public class InfoOverlay {
                     "sieć korporacji",
                     "trudność: wysoka",
                     "#c92a2a",
-                    "złożona infrastruktura serwerowa z wieloma węzłami i rozgałęzieniami ruchu. wymaga pełnej synchronizacji firewalli, antywirusów i skanerów IDS."
+                    "złożona infrastruktura serwerowa z wieloma węzłami, rozgałęzieniami ruchu oraz atakami ransomware. wymaga pełnej synchronizacji firewalli, antywirusów, skanerów IDS i dekryptorów."
                 );
         }
     }

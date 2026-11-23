@@ -92,8 +92,19 @@ public class Virus {
         this.graphic.setLayoutY(pixelY - 22.5);
     }
 
-    public void takeTowerDamage(int baseAmount, boolean fromIds) {
-        double mult = fromIds ? type.getIdsDamageMultiplier() : type.getAntivirusDamageMultiplier();
+    public void takeTowerDamage(int baseAmount, Antivirus.TowerType towerType) {
+        double mult;
+        switch (towerType) {
+            case IDS:
+                mult = type.getIdsDamageMultiplier();
+                break;
+            case DEC:
+                mult = type.getDecryptorDamageMultiplier();
+                break;
+            default:
+                mult = type.getAntivirusDamageMultiplier();
+                break;
+        }
         int actualDamage = (int) Math.round(baseAmount * mult);
         if (actualDamage < 1) actualDamage = 1;
         this.hp -= actualDamage;
