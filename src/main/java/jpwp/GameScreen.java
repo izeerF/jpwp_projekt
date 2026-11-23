@@ -41,6 +41,7 @@ public class GameScreen {
 
     private int hp = 100;
     private int money = 150;
+    private int enemiesNeutralized = 0;
     private int waveNumber = 0;
     private boolean isWaveActive = false;
     private int spawnedInCurrentWave = 0;
@@ -75,9 +76,14 @@ public class GameScreen {
     private int[][] intersectionState = new int[12][12];
 
     public Scene getScene(Stage primaryStage, Scene menuScene) {
-        currentLevel = 1;
+        return getScene(primaryStage, menuScene, 1);
+    }
+
+    public Scene getScene(Stage primaryStage, Scene menuScene, int startLevel) {
+        currentLevel = startLevel;
         hp = 100;
-        money = 150;
+        money = 150 + (startLevel - 1) * 100;
+        enemiesNeutralized = 0;
         gameSpeed = 1.0;
         discoveredItems.clear();
         pendingDiscoveries.clear();
@@ -264,6 +270,7 @@ public class GameScreen {
                         if (virus.getHp() <= 0) {
                             gameBoard.getChildren().remove(virus.getGraphic());
                             toRemove.add(virus);
+                            enemiesNeutralized++;
                             money += virus.getReward();
                             moneyLabel.setText("budzet: " + money + " pgCoinow");
                         }
@@ -294,7 +301,8 @@ public class GameScreen {
                         
                         if (hp <= 0) {
                             gameLoop.stop();
-                            primaryStage.setScene(menuScene);
+                            showEndGameOverlay(rootStack, false, primaryStage, menuScene);
+                            return;
                         }
                         break;
                     }
@@ -331,6 +339,7 @@ public class GameScreen {
                                 fw.destroyEnemy();
                                 gameBoard.getChildren().remove(virus.getGraphic());
                                 toRemove.add(virus);
+                                enemiesNeutralized++;
                                 removedThisTurn = true;
                                 break;
                             }
@@ -387,8 +396,8 @@ public class GameScreen {
                             startWaveBtn.setText("przejdz do poziomu " + (currentLevel + 1));
                             startWaveBtn.setDisable(false);
                         } else {
-                            startWaveBtn.setText("gra ukonczona");
-                            startWaveBtn.setDisable(true);
+                            gameLoop.stop();
+                            showEndGameOverlay(rootStack, true, primaryStage, menuScene);
                         }
                     }
                 }
@@ -403,6 +412,52 @@ public class GameScreen {
         processPopups(rootStack);
 
         return new Scene(rootStack, 1000, 700);
+    }
+
+    private void showEndGameOverlay(StackPane rootStack, boolean victory, Stage primaryStage, Scene menuScene) {
+        StackPane backdrop = new StackPane();
+        backdrop.setStyle("-fx-background-color: rgba(0, 0, 0, 0.85);");
+
+        VBox card = new VBox(18);
+        card.setPadding(new Insets(35));
+        card.setPrefSize(520, 320);
+        card.setMaxSize(520, 320);
+        card.setAlignment(Pos.CENTER);
+        card.setStyle(
+            "-fx-background-color: white;" +
+            "-fx-background-radius: 14;" +
+            "-fx-border-color: " + (victory ? "#2b8a3e" : "#c92a2a") + ";" +
+            "-fx-border-radius: 14;" +
+            "-fx-border-width: 3;"
+        );
+
+        Label title = new Label(victory ? "system zabezpieczony" : "naruszenie bezpieczeństwa");
+        title.setFont(Font.font("System", FontWeight.BOLD, 26));
+        title.setTextFill(victory ? Color.DARKGREEN : Color.FIREBRICK);
+
+        Label subtitle = new Label(victory
+            ? "wszystkie sieci zostały skutecznie obronione przed atakiem."
+            : "zbyt wiele złośliwych pakietów przedostało się do serwera.");
+        subtitle.setWrapText(true);
+        subtitle.setFont(Font.font("System", 14));
+
+        Label stats = new Label(
+            "osiągnięty poziom: " + currentLevel + " / " + maxLevels +
+            "\nzneutralizowane zagrożenia: " + enemiesNeutralized +
+            "\npozostałe hp serwera: " + Math.max(0, hp)
+        );
+        stats.setFont(Font.font("System", FontWeight.BOLD, 14));
+        stats.setStyle("-fx-background-color: #f1f3f5; -fx-padding: 12; -fx-background-radius: 8;");
+
+        Button menuBtn = new Button("powrót do menu głównego");
+        menuBtn.setFont(Font.font("System", FontWeight.BOLD, 14));
+        menuBtn.setMinSize(220, 42);
+        menuBtn.setStyle("-fx-cursor: hand;");
+        menuBtn.setOnAction(e -> primaryStage.setScene(menuScene));
+
+        card.getChildren().addAll(title, subtitle, stats, menuBtn);
+        backdrop.getChildren().add(card);
+        rootStack.getChildren().add(backdrop);
     }
 
     private void queueDiscovery(String id, StackPane rootStack) {
@@ -478,13 +533,8 @@ public class GameScreen {
             }
         }
 
-        if (level == 1) {
-            queueDiscovery("FW", rootStack);
-            if (hasTowerTiles) {
-                queueDiscovery("AV", rootStack);
-                queueDiscovery("IDS", rootStack);
-            }
-        } else if (hasTowerTiles) {
+        queueDiscovery("FW", rootStack);
+        if (hasTowerTiles) {
             queueDiscovery("AV", rootStack);
             queueDiscovery("IDS", rootStack);
         }
