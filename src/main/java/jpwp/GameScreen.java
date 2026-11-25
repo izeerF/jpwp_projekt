@@ -392,6 +392,9 @@ public class GameScreen {
                             }
                         }
                     }
+                    if (selectedFirewall != null) {
+                        updateInspector(effectsLayer);
+                    }
                 }
 
                 List<Virus> toRemove = new ArrayList<>();
@@ -665,7 +668,8 @@ public class GameScreen {
             inspectorBox.setVisible(true);
             inspectorBox.setManaged(true);
             inspectorTitleLabel.setText("firewall (poz. " + selectedFirewall.getLevel() + ")");
-            inspectorStatsLabel.setText("blokady: " + selectedFirewall.getMaxBlocks() + " | odnowienie: " + selectedFirewall.getCooldownDuration() + "s");
+            String status = selectedFirewall.isOnCooldown() ? "przeciążony (" + selectedFirewall.getCooldownTimer() + "s)" : "aktywny (" + selectedFirewall.getRemainingBlocks() + "/" + selectedFirewall.getMaxBlocks() + ")";
+            inspectorStatsLabel.setText(status + " | regen: " + selectedFirewall.getCooldownDuration() + "s");
 
             if (selectedFirewall.canUpgrade()) {
                 upgradeBtn.setText("ulepsz (" + selectedFirewall.getUpgradeCost() + " pgC)");
