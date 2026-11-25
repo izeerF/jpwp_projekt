@@ -12,12 +12,16 @@ import java.util.Scanner;
 import java.util.Set;
 
 import javafx.animation.AnimationTimer;
+import javafx.animation.FadeTransition;
+import javafx.animation.ParallelTransition;
 import javafx.animation.PauseTransition;
+import javafx.animation.TranslateTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -27,6 +31,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.StrokeType;
@@ -59,7 +64,7 @@ public class GameScreen {
     private List<WaveData> levelWaves = new ArrayList<>();
     private WaveData currentWaveData = null;
 
-    private int buyingType = 0; // 0 - nic, 1 - firewall, 2 - antivirus, 3 - ids, 4 - dekryptor (sandbox)
+    private int buyingType = 0; // 0 - nic, 1 - firewall, 2 - antivirus, 3 - ids, 4 - dekryptor
     private Label levelTitleLabel;
     private Label levelLabel;
     private Label hpLabel;
@@ -75,6 +80,7 @@ public class GameScreen {
     private Button sellBtn;
     private Firewall selectedFirewall = null;
     private Antivirus selectedTower = null;
+    private Circle rangeIndicator = null;
 
     private List<Virus> activeViruses = new ArrayList<>();
     private List<Antivirus> activeTowers = new ArrayList<>();
@@ -134,7 +140,7 @@ public class GameScreen {
         Button buyIdsBtn = new Button("kup skaner IDS (koszt: 90)");
         buyIdsBtn.setMinWidth(195);
 
-        Button buyDecBtn = new Button("kup sandbox (koszt: 110)");
+        Button buyDecBtn = new Button("kup dekryptor (koszt: 110)");
         buyDecBtn.setMinWidth(195);
 
         inspectorBox = new VBox(6);
@@ -208,7 +214,7 @@ public class GameScreen {
                     money -= cost;
                     moneyLabel.setText("budzet: " + money + " pgCoinow");
                     selectedFirewall.upgrade();
-                    updateInspector();
+                    updateInspector(effectsLayer);
                 }
             } else if (selectedTower != null && selectedTower.canUpgrade()) {
                 int cost = selectedTower.getUpgradeCost();
@@ -216,7 +222,7 @@ public class GameScreen {
                     money -= cost;
                     moneyLabel.setText("budzet: " + money + " pgCoinow");
                     selectedTower.upgrade();
-                    updateInspector();
+                    updateInspector(effectsLayer);
                 }
             }
         });
@@ -230,7 +236,7 @@ public class GameScreen {
                 gameBoard.getChildren().remove(selectedFirewall.getGraphic());
                 activeFirewalls[fy][fx] = null;
                 mapGrid[fy][fx] = 1;
-                clearSelection();
+                clearSelection(effectsLayer);
             } else if (selectedTower != null) {
                 money += selectedTower.getSellValue();
                 moneyLabel.setText("budzet: " + money + " pgCoinow");
@@ -240,12 +246,13 @@ public class GameScreen {
                 activeTowers.remove(selectedTower);
                 towerTimers.remove(selectedTower);
                 mapGrid[ty][tx] = 2;
-                clearSelection();
+                clearSelection(effectsLayer);
             }
         });
 
         buyFirewallBtn.setOnAction(e -> {
-            clearSelection();
+            clearSelection(effectsLayer);
+            hideRangePreview(effectsLayer);
             if (buyingType == 1) {
                 buyingType = 0;
                 resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
@@ -259,7 +266,8 @@ public class GameScreen {
         });
 
         buyTowerBtn.setOnAction(e -> {
-            clearSelection();
+            clearSelection(effectsLayer);
+            hideRangePreview(effectsLayer);
             if (buyingType == 2) {
                 buyingType = 0;
                 resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
@@ -274,7 +282,8 @@ public class GameScreen {
 
         buyIdsBtn.setOnAction(e -> {
             if (currentLevel < 2) return;
-            clearSelection();
+            clearSelection(effectsLayer);
+            hideRangePreview(effectsLayer);
             if (buyingType == 3) {
                 buyingType = 0;
                 resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
@@ -289,7 +298,8 @@ public class GameScreen {
 
         buyDecBtn.setOnAction(e -> {
             if (currentLevel < 3) return;
-            clearSelection();
+            clearSelection(effectsLayer);
+            hideRangePreview(effectsLayer);
             if (buyingType == 4) {
                 buyingType = 0;
                 resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
@@ -391,10 +401,31 @@ public class GameScreen {
                     if (timer >= 1.0) {
                         for (Virus virus : activeViruses) {
                             if (!toRemove.contains(virus) && tower.isInRange(virus.getPixelX(), virus.getPixelY())) {
+                                int hpBefore = virus.getHp();
                                 drawLaser(effectsLayer, tower.getX(), tower.getY(), virus.getPixelX(), virus.getPixelY(), tower.getLaserColor());
                                 virus.takeTowerDamage(tower.getBaseDamage(), tower.getTowerType());
+                                int dealt = hpBefore - virus.getHp();
+                                boolean isCrit = dealt > tower.getBaseDamage();
+
+                                spawnFloatingText(
+                                    effectsLayer,
+                                    virus.getPixelX(),
+                                    virus.getPixelY() - 12,
+                                    "-" + dealt + (isCrit ? "!" : ""),
+                                    isCrit ? Color.GOLD : Color.WHITE,
+                                    isCrit
+                                );
+
                                 timer = 0.0;
                                 if (virus.getHp() <= 0) {
+                                    spawnFloatingText(
+                                        effectsLayer,
+                                        virus.getPixelX(),
+                                        virus.getPixelY() - 26,
+                                        "+" + virus.getReward() + " pgC",
+                                        Color.LIMEGREEN,
+                                        true
+                                    );
                                     entitiesLayer.getChildren().remove(virus.getGraphic());
                                     toRemove.add(virus);
                                     enemiesNeutralized++;
@@ -416,6 +447,7 @@ public class GameScreen {
                         int vy = virus.getY();
 
                         if (vx == 11) {
+                            spawnFloatingText(effectsLayer, virus.getPixelX(), virus.getPixelY() - 14, "-10 HP", Color.CRIMSON, true);
                             entitiesLayer.getChildren().remove(virus.getGraphic());
                             toRemove.add(virus);
 
@@ -445,6 +477,7 @@ public class GameScreen {
                             Firewall fw = activeFirewalls[cy][cx];
                             if (fw != null && !fw.isOnCooldown()) {
                                 fw.destroyEnemy();
+                                spawnFloatingText(effectsLayer, virus.getPixelX(), virus.getPixelY() - 14, "ZABLOKOWANO", Color.ORANGERED, true);
                                 entitiesLayer.getChildren().remove(virus.getGraphic());
                                 toRemove.add(virus);
                                 enemiesNeutralized++;
@@ -512,10 +545,51 @@ public class GameScreen {
 
         processPopups(rootStack);
 
-        return new Scene(rootStack, 1000, 700);
+        Scene scene = new Scene(rootStack, 1000, 700);
+        scene.setOnKeyPressed(e -> {
+            if (isPopupOpen) return;
+            if (e.getCode() == KeyCode.ESCAPE) {
+                if (buyingType != 0) {
+                    buyingType = 0;
+                    resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
+                    toggleHighlight(0);
+                    hideRangePreview(effectsLayer);
+                }
+                clearSelection(effectsLayer);
+            } else if (e.getCode() == KeyCode.SPACE) {
+                if (!startWaveBtn.isDisabled()) {
+                    startWaveBtn.fire();
+                } else {
+                    speedBtn.fire();
+                }
+            }
+        });
+
+        return scene;
     }
 
-private void resetBuyButtons(Button buyFirewallBtn, Button buyTowerBtn, Button buyIdsBtn, Button buyDecBtn) {
+    private void spawnFloatingText(Pane layer, double x, double y, String text, Color color, boolean bold) {
+        Label label = new Label(text);
+        label.setTextFill(color);
+        label.setFont(Font.font("System", bold ? FontWeight.BOLD : FontWeight.NORMAL, bold ? 12 : 11));
+        label.setStyle("-fx-effect: dropshadow(gaussian, black, 3, 0.8, 0, 0);");
+        label.setLayoutX(x - 18);
+        label.setLayoutY(y);
+        layer.getChildren().add(label);
+
+        TranslateTransition moveUp = new TranslateTransition(Duration.millis(650 / gameSpeed), label);
+        moveUp.setByY(-22);
+
+        FadeTransition fadeOut = new FadeTransition(Duration.millis(650 / gameSpeed), label);
+        fadeOut.setFromValue(1.0);
+        fadeOut.setToValue(0.0);
+
+        ParallelTransition anim = new ParallelTransition(moveUp, fadeOut);
+        anim.setOnFinished(ev -> layer.getChildren().remove(label));
+        anim.play();
+    }
+
+    private void resetBuyButtons(Button buyFirewallBtn, Button buyTowerBtn, Button buyIdsBtn, Button buyDecBtn) {
         buyFirewallBtn.setText("kup firewall (koszt: 50)");
         buyTowerBtn.setText("kup antywirus (koszt: 75)");
         buyIdsBtn.setText(currentLevel >= 2 ? "kup skaner IDS (koszt: 90)" : "skaner IDS (poziom 2)");
@@ -544,26 +618,49 @@ private void resetBuyButtons(Button buyFirewallBtn, Button buyTowerBtn, Button b
         return null;
     }
 
-    private void selectFirewall(Firewall fw) {
+    private void selectFirewall(Firewall fw, Pane effectsLayer) {
         selectedFirewall = fw;
         selectedTower = null;
-        updateInspector();
+        updateInspector(effectsLayer);
     }
 
-    private void selectTower(Antivirus tower) {
+    private void selectTower(Antivirus tower, Pane effectsLayer) {
         selectedTower = tower;
         selectedFirewall = null;
-        updateInspector();
+        updateInspector(effectsLayer);
     }
 
-    private void clearSelection() {
+    private void clearSelection(Pane effectsLayer) {
         selectedFirewall = null;
         selectedTower = null;
         inspectorBox.setVisible(false);
         inspectorBox.setManaged(false);
+        hideRangePreview(effectsLayer);
     }
 
-    private void updateInspector() {
+    private void showRangePreview(Pane effectsLayer, int col, int row, int range, Color color) {
+        hideRangePreview(effectsLayer);
+        double centerX = (col + 1) * 45.0 + 22.5;
+        double centerY = row * 45.0 + 22.5;
+        double radiusPx = (range + 0.5) * 45.0;
+
+        rangeIndicator = new Circle(centerX, centerY, radiusPx);
+        rangeIndicator.setFill(color.deriveColor(0, 1, 1, 0.14));
+        rangeIndicator.setStroke(color);
+        rangeIndicator.setStrokeWidth(1.5);
+        effectsLayer.getChildren().add(rangeIndicator);
+    }
+
+    private void hideRangePreview(Pane effectsLayer) {
+        if (rangeIndicator != null && effectsLayer != null) {
+            effectsLayer.getChildren().remove(rangeIndicator);
+            rangeIndicator = null;
+        }
+    }
+
+    private void updateInspector(Pane effectsLayer) {
+        hideRangePreview(effectsLayer);
+
         if (selectedFirewall != null) {
             inspectorBox.setVisible(true);
             inspectorBox.setManaged(true);
@@ -584,6 +681,8 @@ private void resetBuyButtons(Button buyFirewallBtn, Button buyTowerBtn, Button b
             String name = selectedTower.getTowerType().getDisplayName();
             inspectorTitleLabel.setText(name + " (poz. " + selectedTower.getLevel() + ")");
             inspectorStatsLabel.setText("obrazenia: " + selectedTower.getBaseDamage() + " | zasieg: " + selectedTower.getRange());
+
+            showRangePreview(effectsLayer, selectedTower.getX(), selectedTower.getY(), selectedTower.getRange(), selectedTower.getLaserColor());
 
             if (selectedTower.canUpgrade()) {
                 upgradeBtn.setText("ulepsz (" + selectedTower.getUpgradeCost() + " pgC)");
@@ -696,7 +795,8 @@ private void resetBuyButtons(Button buyFirewallBtn, Button buyTowerBtn, Button b
         currentSpawnIndex = 0;
         spawnTimer = 0.0;
         firewallSecondTimer = 0.0;
-        clearSelection();
+        rangeIndicator = null;
+        clearSelection(effectsLayer);
 
         waveNumber = 0;
         isWaveActive = false;
@@ -718,7 +818,6 @@ private void resetBuyButtons(Button buyFirewallBtn, Button buyTowerBtn, Button b
             }
         }
 
-        // progresywne odblokowywanie wiezyczek i ich wpisow w encyklopedii
         queueDiscovery("FW", rootStack);
         if (hasTowerTiles) {
             queueDiscovery("AV", rootStack);
@@ -790,11 +889,12 @@ private void resetBuyButtons(Button buyFirewallBtn, Button buyTowerBtn, Button b
                         resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
 
                         toggleHighlight(0);
+                        hideRangePreview(effectsLayer);
                         mapGrid[finalRow][finalCol] = 3;
 
                         Firewall firewall = new Firewall(finalCol, finalRow);
                         firewall.getGraphic().setOnMouseClicked(ev -> {
-                            if (buyingType == 0) selectFirewall(firewall);
+                            if (buyingType == 0) selectFirewall(firewall, effectsLayer);
                         });
                         activeFirewalls[finalRow][finalCol] = firewall;
                         gameBoard.add(firewall.getGraphic(), finalCol + 1, finalRow);
@@ -814,18 +914,34 @@ private void resetBuyButtons(Button buyFirewallBtn, Button buyTowerBtn, Button b
                         resetBuyButtons(buyFirewallBtn, buyTowerBtn, buyIdsBtn, buyDecBtn);
 
                         toggleHighlight(0);
+                        hideRangePreview(effectsLayer);
                         mapGrid[finalRow][finalCol] = 4;
 
                         Antivirus tower = new Antivirus(finalCol, finalRow, chosenType);
                         tower.getGraphic().setOnMouseClicked(ev -> {
-                            if (buyingType == 0) selectTower(tower);
+                            if (buyingType == 0) selectTower(tower, effectsLayer);
                         });
                         activeTowers.add(tower);
                         towerTimers.put(tower, 1.0);
                         gameBoard.add(tower.getGraphic(), finalCol + 1, finalRow);
                         queueDiscovery(chosenType.name(), rootStack);
                     } else if (buyingType == 0) {
-                        clearSelection();
+                        clearSelection(effectsLayer);
+                    }
+                });
+
+                tile.setOnMouseEntered(e -> {
+                    if (buyingType >= 2 && buyingType <= 4 && mapGrid[finalRow][finalCol] == 2) {
+                        Antivirus.TowerType previewType = (buyingType == 3)
+                            ? Antivirus.TowerType.IDS
+                            : (buyingType == 4 ? Antivirus.TowerType.DEC : Antivirus.TowerType.AV);
+                        showRangePreview(effectsLayer, finalCol, finalRow, previewType.getBaseRange(), previewType.getLaserColor());
+                    }
+                });
+
+                tile.setOnMouseExited(e -> {
+                    if (buyingType >= 2 && buyingType <= 4) {
+                        hideRangePreview(effectsLayer);
                     }
                 });
 

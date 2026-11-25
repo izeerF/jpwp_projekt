@@ -134,11 +134,14 @@ public class Antivirus {
         return totalInvested / 2;
     }
 
+    public double getRangeRadiusPx() {
+        return (range + 0.5) * 45.0;
+    }
+
     public boolean isInRange(double targetPixelX, double targetPixelY) {
         double towerPx = (this.x + 1) * 45.0 + 22.5;
         double towerPy = this.y * 45.0 + 22.5;
-        double maxDistPx = (range + 0.5) * 45.0;
-        return Math.hypot(towerPx - targetPixelX, towerPy - targetPixelY) <= maxDistPx;
+        return Math.hypot(towerPx - targetPixelX, towerPy - targetPixelY) <= getRangeRadiusPx();
     }
 
     public int getLevel() { return level; }
